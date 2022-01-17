@@ -1,0 +1,12 @@
+How to create a tactile enabled physical robot interaction dataset.
+
+1. Get robot motions working. Simple, straight line, point to point.
+2. Enforce a box limit and randomize two random points (start and finish).
+3. Ensure tactile sensor is facing the correct wayduring trajectories,
+4. Attach tactile sensor.
+5. Read data from tactile sensor.
+6. Attach camera.
+7. Read data from camera.
+8. Synch and store all data streams.
+9. Build box for objects, get set of objects and start data collection.
+10. Run for three days 
