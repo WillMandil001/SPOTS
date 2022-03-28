@@ -38,8 +38,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 
-model_path      = "/home/user/Robotics/SPOTS/models/SVG_tactile_enhanced/saved_models/PRI_single_object_purple_model_11_02_2022_17_56/SVG_model"
-data_save_path  = "/home/user/Robotics/SPOTS/models/SVG_tactile_enhanced/saved_models/PRI_single_object_purple_model_11_02_2022_17_56/"
+model_path      = "/home/user/Robotics/SPOTS/models/SVG_tactile_enhanced/saved_models/PRI_single_object_purple_model_09_02_2022_14_16/SVG_model"
+data_save_path  = "/home/user/Robotics/SPOTS/models/SVG_tactile_enhanced/saved_models/PRI_single_object_purple_model_09_02_2022_14_16/"
 test_data_dir   = "/home/user/Robotics/Data_sets/PRI/single_object_purple/test_no_new_formatted/"
 scaler_dir      = "/home/user/Robotics/Data_sets/PRI/single_object_purple/scalars/"
 
@@ -145,7 +145,6 @@ class ModelTester:
         self.mae_criterion.cuda()
 
         self.criterion = nn.L1Loss()
-        self.load_scalars()
 
     def run(self, scene_and_touch, actions, test=False):
         mae, kld = 0, 0
@@ -246,32 +245,36 @@ class ModelTester:
                     action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
                     mae, kld, predictions = self.run(scene_and_touch=scene_and_touch, actions=action, test=True)
 
-            #         for i in range(10):
-            #             plt.figure(1)
-            #             f, axarr = plt.subplots(1, 2)
-            #             axarr[0].set_title("predictions: t_" + str(i))
-            #             axarr[0].imshow(np.array(predictions[i][7].permute(1, 2, 0).cpu().detach())[:,:,3:])
-            #             axarr[1].set_title("ground truth: t_" + str(i))
-            #             axarr[1].imshow(np.array(images[context_frames+i][7].permute(1, 2, 0).cpu().detach()))
-            #             plt.savefig(data_save_path + str(i) + ".png")
-            #         break
-            #     break
-            # break
+                    for i in range(10):
+                        plt.figure(1)
+                        f, axarr = plt.subplots(1, 4)
+                        axarr[0].set_title("-- PERFECT PRIOR - predictions: t_" + str(i))
+                        axarr[0].imshow(np.array(predictions[i][7].permute(1, 2, 0).cpu().detach())[:,:,:3])
+                        axarr[1].set_title("- PERFECT PRIOR - predictions: t_" + str(i))
+                        axarr[1].imshow(np.array(predictions[i][7].permute(1, 2, 0).cpu().detach())[:,:,3:])
+                        axarr[2].set_title("PERFECT PRIOR - predictions: t_" + str(i))
+                        axarr[2].imshow(np.array(predictions[i][7].permute(1, 2, 0).cpu().detach())[:,:,2:5])
+                        axarr[3].set_title("ground truth: t_" + str(i))
+                        axarr[3].imshow(np.array(images[context_frames+i][7].permute(1, 2, 0).cpu().detach()))
+                        plt.savefig(data_save_path + str(i) + ".png")
+                    break
+                break
+            break
 
-            mae = self.mae_criterion(predictions[:, :, 3:, :, :], images[context_frames:]).data
-
-            # calculate trial loss:
-            self.total_losses.append(["trial number: " + str(trial), np.array(mae.cpu().detach())])
-
-        np.save(data_save_path + "test_no_new_losses_per_trial", np.array(self.total_losses))
-
-        print(self.total_losses)
-
-        final_loss = sum([i[1] for i in self.total_losses]) / len(self.total_losses)
-
-        np.save(data_save_path + "test_no_new_loss", np.array(final_loss))
-        print(np.array(self.total_losses))
-        print(final_loss)
+        #     mae = self.mae_criterion(predictions[:, :, 3:, :, :], images[context_frames:]).data
+        #
+        #     # calculate trial loss:
+        #     self.total_losses.append(["trial number: " + str(trial), np.array(mae.cpu().detach())])
+        #
+        # np.save(data_save_path + "test_no_new_losses_per_trial", np.array(self.total_losses))
+        #
+        # print(self.total_losses)
+        #
+        # final_loss = sum([i[1] for i in self.total_losses]) / len(self.total_losses)
+        #
+        # np.save(data_save_path + "test_no_new_loss", np.array(final_loss))
+        # print(np.array(self.total_losses))
+        # print(final_loss)
 
 
 if __name__ == "__main__":

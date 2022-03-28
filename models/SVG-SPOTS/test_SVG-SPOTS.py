@@ -312,7 +312,7 @@ class ModelTester:
                     images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
                     tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(device)
                     action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
-                    mae, kld, predictions = self.run(scene=images, tactile=tactile, actions=action, test=True)
+                    mae, kld, predictions = self.run(scene=images, tactile=tactile, actions=action, test=False)
 
                     for i in range(10):
                         plt.figure(1)

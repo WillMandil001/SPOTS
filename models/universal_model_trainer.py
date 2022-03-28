@@ -4,45 +4,129 @@ import os
 import csv
 import cv2
 import copy
+import utils
 import numpy as np
 
 from tqdm import tqdm
 from datetime import datetime
 from torch.utils.data import Dataset
+from torch.autograd import Variable
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 
-seed = 42
+model_save_path = "/home/wmandil/Robotics/SPOTS/SPOTS/models/SVG/saved_models/PRI_object1_motion1_SVG_"
+train_data_dir  = "/home/wmandil/Robotics/Data_sets/PRI/object1_motion1/train_formatted/"
+scaler_dir      = "/home/wmandil/Robotics/Data_sets/PRI/object1_motion1/scalars/"
+
+# unique save title:
+model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
+os.mkdir(model_save_path)
+
+lr=0.0001
+beta1=0.9
+batch_size=32
+log_dir='logs/lp'
+model_dir=''
+name=''
+data_root='data'
+optimizer='adam'
+niter=300
+seed=1
+epoch_size=600
+image_width=64
+channels=3
+out_channels = 3
+dataset='smmnist'
+n_past=10
+n_future=10
+n_eval=20
+rnn_size=256
+prior_rnn_layers=3
+posterior_rnn_layers=3
+predictor_rnn_layers=4
+state_action_size = 12
+z_dim=10  # number of latent variables
+g_dim=256  # 128
+beta=0.0001  # was 0.0001
+data_threads=5
+num_digits=2
+last_frame_skip='store_true'
+epochs = 100
+
+train_percentage = 0.9
+validation_percentage = 0.1
+
+features = [lr, beta1, batch_size, log_dir, model_dir, name, data_root, optimizer, niter, seed, epoch_size,
+            image_width, channels, out_channels, dataset, n_past, n_future, n_eval, rnn_size, prior_rnn_layers,
+            posterior_rnn_layers, predictor_rnn_layers, z_dim, g_dim, beta, data_threads, num_digits,
+            last_frame_skip, epochs, train_percentage, validation_percentage]
 
 torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # use gpu if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")#  use gpu if available
 
 
 class BatchGenerator:
-    def __init__(self, train_percentage, train_data_dir, batch_size, image_size):
-        self.batch_size = batch_size
-        self.image_size = image_size
-        self.train_data_dir = train_data_dir
-        self.train_percentage = train_percentage
+    def __init__(self):
         self.data_map = []
-        with open(train_data_dir + 'map.csv', 'r') as f:
+        with open(train_data_dir + 'map.csv', 'r') as f:  # rb
             reader = csv.reader(f)
             for row in reader:
                 self.data_map.append(row)
 
     def load_full_data(self):
-        dataset_train = FullDataSet(self.data_map, self.train_percentage, self.train_data_dir, self.image_size, train=True)
-        dataset_validate = FullDataSet(self.data_map, self.train_percentage, self.train_data_dir, self.image_size, validation=True)
+        dataset_train = FullDataSet(self.data_map, train=True)
+        dataset_validate = FullDataSet(self.data_map, validation=True)
         transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
-        train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=self.batch_size, shuffle=True, num_workers=6)
-        validation_loader = torch.utils.data.DataLoader(dataset_validate, batch_size=self.batch_size, shuffle=True, num_workers=6)
+        train_loader = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=12)
+        validation_loader = torch.utils.data.DataLoader(dataset_validate, batch_size=batch_size, shuffle=True, num_workers=12)
         self.data_map = []
         return train_loader, validation_loader
+
+
+class FullDataSet:
+    def __init__(self, data_map, train=False, validation=False):
+        if train:
+            self.samples = data_map[1:int((len(data_map) * train_percentage))]
+        if validation:
+            self.samples = data_map[int((len(data_map) * train_percentage)): -1]
+        data_map = None
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        value = self.samples[idx]
+        robot_data = np.load(train_data_dir + value[0])
+
+        tactile_data = np.load(train_data_dir + value[1])
+        tactile_images = []
+        for tactile_data_sample in tactile_data:
+            tactile_images.append(create_image(tactile_data_sample[0], tactile_data_sample[1], tactile_data_sample[2]))
+
+        images = []
+        for image_name in np.load(train_data_dir + value[2]):
+            images.append(np.load(train_data_dir + image_name))
+
+        experiment_number = np.load(train_data_dir + value[3])
+        time_steps = np.load(train_data_dir + value[4])
+        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), experiment_number, time_steps]
+
+
+def create_image(tactile_x, tactile_y, tactile_z):
+    # convert tactile data into an image:
+    image = np.zeros((4 ,4, 3), np.float32)
+    index = 0
+    for x in range(4):
+        for y in range(4):
+            image[x][y] = [tactile_x[index], tactile_y[index], tactile_z[index]]
+            index += 1
+    reshaped_image = cv2.resize(image.astype(np.float32), dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
+    return reshaped_image
 
 
 class FullDataSet:

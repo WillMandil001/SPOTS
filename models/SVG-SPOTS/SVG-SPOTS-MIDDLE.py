@@ -25,7 +25,6 @@ scaler_dir      = "/home/willmandil/Robotics/Data_sets/PRI/single_object_purple/
 model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
 os.mkdir(model_save_path)
 
-
 loss_function = "Basic"  # "basic", "split"
 training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
 training_stages_epochs = [50, 50, 50]

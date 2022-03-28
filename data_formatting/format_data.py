@@ -17,7 +17,13 @@ from sklearn import preprocessing
 from datetime import datetime
 from scipy.spatial.transform import Rotation as R
 
-dataset_path = "/home/user/Robotics/Data_sets/PRI/single_object_purple/"
+# SVG
+# SVTG_SE
+# SPOTS_SVG_ACTP
+
+
+
+dataset_path = "/home/user/Robotics/Data_sets/PRI/object1_motion1/"
 # Hyper-parameters:
 train_data_dir = dataset_path + 'Train/'
 test_data_dir  = dataset_path + 'Test_no_new/'

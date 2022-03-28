@@ -17,17 +17,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 
-model_save_path = "/home/user/Robotics/SPOTS/models/SVG_tactile_enhanced/saved_models/PRI_single_object_purple_"
+model_save_path = "/home/user/Robotics/SPOTS/models/SVTG_MMFM/saved_models/PRI_single_object_purple_STVG_MMFM_SE_SOP_TG_"
 train_data_dir  = "/home/user/Robotics/Data_sets/PRI/single_object_purple/train_formatted/"
 scaler_dir      = "/home/user/Robotics/Data_sets/PRI/single_object_purple/scalars/"
 
 # unique save title:
 model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
-# os.mkdir(model_save_path)
+os.mkdir(model_save_path)
 
 lr=0.0001
 beta1=0.9
-batch_size=8
+batch_size=16
 log_dir='logs/lp'
 model_dir=''
 name=''
@@ -37,24 +37,28 @@ niter=300
 seed=1
 epoch_size=600
 image_width=64
-channels=6
-out_channels = 6
+channels=3
+out_channels = 3
 dataset='smmnist'
 n_past=10
 n_future=10
 n_eval=20
-rnn_size=256*2
+rnn_size=256*2   # CHANGE THIS BACK TO 256!!!!!!!!!!!!! AND RETRAIN
 prior_rnn_layers=3
 posterior_rnn_layers=3
 predictor_rnn_layers=4
 state_action_size = 12
 z_dim=10  # number of latent variables
-g_dim=256*2  # 128
+g_dim=256  # 128
+# g_dim_scene = 256
+# g_dim_touch = 256
 beta=0.0001  # was 0.0001
 data_threads=5
 num_digits=2
 last_frame_skip = 'store_true'
 epochs = 100
+
+tactile_gain = 0.1
 
 train_percentage = 0.9
 validation_percentage = 0.1
@@ -62,7 +66,7 @@ validation_percentage = 0.1
 features = [lr, beta1, batch_size, log_dir, model_dir, name, data_root, optimizer, niter, seed, epoch_size,
             image_width, channels, out_channels, dataset, n_past, n_future, n_eval, rnn_size, prior_rnn_layers,
             posterior_rnn_layers, predictor_rnn_layers, z_dim, g_dim, beta, data_threads, num_digits,
-            last_frame_skip, epochs, train_percentage, validation_percentage]
+            last_frame_skip, epochs, train_percentage, validation_percentage, tactile_gain]
 
 torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
@@ -119,7 +123,13 @@ class FullDataSet:
 
 def create_image(tactile):
     # convert tactile data into an image:
-    return cv2.resize(tactile.reshape(3, 4, 4).astype(np.float32), dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
+    image = np.zeros((4, 4, 3), np.float32)
+    index = 0
+    for x in range(4):
+        for y in range(4):
+            image[x][y] = [tactile[0][index], tactile[1][index], tactile[1][index]]
+            index += 1
+    return cv2.resize(image.astype(np.float32), dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
 
 
 class ModelTrainer:
@@ -129,102 +139,143 @@ class ModelTrainer:
         self.optimizer = optim.Adam
 
         import models.lstm as lstm_models
-        self.frame_predictor = lstm_models.lstm(g_dim + z_dim + state_action_size, g_dim, rnn_size, predictor_rnn_layers, batch_size)
+        self.frame_predictor = lstm_models.lstm((g_dim) + z_dim + state_action_size, g_dim, rnn_size, predictor_rnn_layers, batch_size)
         self.posterior = lstm_models.gaussian_lstm(g_dim, z_dim, rnn_size, posterior_rnn_layers, batch_size)
         self.prior = lstm_models.gaussian_lstm(g_dim, z_dim, rnn_size, prior_rnn_layers, batch_size)
         self.frame_predictor.apply(utils.init_weights)
         self.posterior.apply(utils.init_weights)
         self.prior.apply(utils.init_weights)
 
+        # Multi-Model Fusion Module:
         import models.dcgan_64 as model
-        self.encoder = model.encoder(g_dim, channels)
-        self.decoder = model.decoder(g_dim, channels)
-        self.encoder.apply(utils.init_weights)
-        self.decoder.apply(utils.init_weights)
+        self.MMFM = model.MMFM(g_dim*2, channels)
+        self.MMFM.apply(utils.init_weights)
+
+        # split encoders
+        self.encoder_scene = model.encoder(g_dim, channels)
+        self.decoder_scene = model.decoder(g_dim, channels)
+
+        self.encoder_tactile = model.encoder(g_dim, channels)
+        self.decoder_tactile = model.decoder(g_dim, channels)
+
+        self.encoder_scene.apply(utils.init_weights)
+        self.decoder_scene.apply(utils.init_weights)
+
+        self.encoder_tactile.apply(utils.init_weights)
+        self.decoder_tactile.apply(utils.init_weights)
 
         self.frame_predictor_optimizer = self.optimizer(self.frame_predictor.parameters(), lr=lr, betas=(beta1, 0.999))
         self.posterior_optimizer = self.optimizer(self.posterior.parameters(), lr=lr, betas=(beta1, 0.999))
         self.prior_optimizer = self.optimizer(self.prior.parameters(), lr=lr, betas=(beta1, 0.999))
-        self.encoder_optimizer = self.optimizer(self.encoder.parameters(), lr=lr, betas=(beta1, 0.999))
-        self.decoder_optimizer = self.optimizer(self.decoder.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.MMFM_optimizer = self.optimizer(self.MMFM.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.encoder_scene_optimizer = self.optimizer(self.encoder_scene.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.encoder_tactile_optimizer = self.optimizer(self.encoder_tactile.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.decoder_scene_optimizer = self.optimizer(self.decoder_scene.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.decoder_tactile_optimizer = self.optimizer(self.decoder_tactile.parameters(), lr=lr, betas=(beta1, 0.999))
 
         self.mae_criterion = nn.L1Loss()
 
         self.frame_predictor.cuda()
         self.posterior.cuda()
         self.prior.cuda()
-        self.encoder.cuda()
-        self.decoder.cuda()
+        self.MMFM.cuda()
+        self.encoder_tactile.cuda()
+        self.encoder_scene.cuda()
+        self.decoder_tactile.cuda()
+        self.decoder_scene.cuda()
         self.mae_criterion.cuda()
 
-    def run(self, scene_and_touch, actions, test=False):
-        mae, kld = 0, 0
+    def run(self, scene, touch, actions, test=False):
+        mae_scene, mae_tactile, kld = 0, 0, 0
         outputs = []
 
         self.frame_predictor.zero_grad()
         self.posterior.zero_grad()
         self.prior.zero_grad()
-        self.encoder.zero_grad()
-        self.decoder.zero_grad()
+        self.MMFM.zero_grad()
+        self.encoder_scene.zero_grad()
+        self.decoder_scene.zero_grad()
+        self.encoder_tactile.zero_grad()
+        self.decoder_tactile.zero_grad()
 
         self.frame_predictor.hidden = self.frame_predictor.init_hidden()
         self.posterior.hidden = self.posterior.init_hidden()
         self.prior.hidden = self.prior.init_hidden()
 
         state = actions[0].to(device)
-        for index, (sample_scene_and_touch, sample_action) in enumerate(zip(scene_and_touch[:-1], actions[1:])):
+        for index, (sample_scene, sample_touch, sample_action) in enumerate(zip(scene[:-1], touch[:-1], actions[1:])):
             state_action = torch.cat((state, actions[index]), 1)
 
             if index > n_past - 1:  # horizon
-                h, skip = self.encoder(x_pred)
-                h_target = self.encoder(scene_and_touch[index + 1])[0]
+                h_scene, skip_scene = self.encoder_scene(x_pred_scene)
+                h_target_scene = self.encoder_scene(scene[index + 1])[0]
+
+                h_tactile, skip_tactile = self.encoder_tactile(x_pred_tactile)
+                h_target_tactile = self.encoder_tactile(touch[index + 1])[0]
+
+                MM_rep = self.MMFM(torch.cat([h_scene, h_tactile], 1))
+                MM_rep_target = self.MMFM(torch.cat([h_target_scene, h_target_tactile], 1))
 
                 if test:
-                    _, mu, logvar = self.posterior(h_target)  # learned prior
-                    z_t, mu_p, logvar_p = self.prior(h)  # learned prior
+                    _, mu, logvar = self.posterior(h_target_scene)
+                    z_t, mu_p, logvar_p = self.prior(h_scene)
                 else:
-                    z_t, mu, logvar = self.posterior(h_target)  # learned prior
-                    _, mu_p, logvar_p = self.prior(h)  # learned prior
+                    z_t, mu, logvar = self.posterior(h_target_scene)
+                    _, mu_p, logvar_p = self.prior(h_scene)
 
-                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action], 1))  # prediction model
-                x_pred = self.decoder([h_pred, skip])  # prediction model
+                h_pred = self.frame_predictor(torch.cat([MM_rep, z_t, state_action], 1))  # prediction model
 
-                mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
+                x_pred_scene = self.decoder_scene([h_pred, skip_scene])  # prediction model
+                x_pred_tactile = self.decoder_tactile([h_pred, skip_tactile])  # prediction model
+
+                mae_scene += self.mae_criterion(x_pred_scene, scene[index + 1])  # prediction model
+                mae_tactile += self.mae_criterion(x_pred_tactile, touch[index + 1])  # prediction model
                 kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
 
-                outputs.append(x_pred)
+                outputs.append(x_pred_scene)
             else:  # context
-                h, skip = self.encoder(scene_and_touch[index])
-                h_target = self.encoder(scene_and_touch[index + 1])[0]   # should this [0] be here????
+                h_scene, skip_scene = self.encoder_scene(scene[index])
+                h_target_scene = self.encoder_scene(scene[index + 1])[0]
+
+                h_tactile, skip_tactile = self.encoder_tactile(touch[index])
+                h_target_tactile = self.encoder_tactile(touch[index + 1])[0]
+
+                MM_rep = self.MMFM(torch.cat([h_scene, h_tactile], 1))
+                MM_rep_target = self.MMFM(torch.cat([h_target_scene, h_target_tactile], 1))
 
                 if test:
-                    _, mu, logvar = self.posterior(h_target)  # learned prior
-                    z_t, mu_p, logvar_p = self.prior(h)  # learned prior
+                    _, mu, logvar = self.posterior(h_target_scene)
+                    z_t, mu_p, logvar_p = self.prior(h_scene)
                 else:
-                    z_t, mu, logvar = self.posterior(h_target)  # learned prior
-                    _, mu_p, logvar_p = self.prior(h)  # learned prior
+                    z_t, mu, logvar = self.posterior(h_target_scene)
+                    _, mu_p, logvar_p = self.prior(h_scene)
 
-                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action], 1))  # prediction model
-                x_pred = self.decoder([h_pred, skip])  # prediction model
+                h_pred = self.frame_predictor(torch.cat([MM_rep, z_t, state_action], 1))  # prediction model
 
-                mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
+                x_pred_scene = self.decoder_scene([h_pred, skip_scene])  # prediction model
+                x_pred_tactile = self.decoder_tactile([h_pred, skip_tactile])  # prediction model
+
+                mae_scene += self.mae_criterion(x_pred_scene, scene[index + 1])  # prediction model
+                mae_tactile += self.mae_criterion(x_pred_tactile, touch[index + 1])  # prediction model
                 kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
 
-                last_output = x_pred
+                last_output = x_pred_scene
 
         outputs = [last_output] + outputs
 
         if test is False:
-            loss = mae + (kld * beta)
+            loss = mae_scene + (mae_tactile*tactile_gain) + (kld * beta)
             loss.backward()
-
             self.frame_predictor_optimizer.step()
+            self.MMFM_optimizer.step()
             self.posterior_optimizer.step()
             self.prior_optimizer.step()
-            self.encoder_optimizer.step()
-            self.decoder_optimizer.step()
+            self.encoder_tactile_optimizer.step()
+            self.decoder_tactile_optimizer.step()
+            self.encoder_scene_optimizer.step()
+            self.decoder_scene_optimizer.step()
 
-        return mae.data.cpu().numpy() / (n_past + n_future), kld.data.cpu().numpy() / (n_future + n_past), torch.stack(outputs)
+        return mae_scene.data.cpu().numpy() / (n_past + n_future), mae_tactile.data.cpu().numpy() / (n_past + n_future), kld.data.cpu().numpy() / (n_future + n_past), torch.stack(outputs)
 
     def kl_criterion(self, mu1, logvar1, mu2, logvar2):
         sigma1 = logvar1.mul(0.5).exp()
@@ -234,10 +285,13 @@ class ModelTrainer:
 
     def train_full_model(self):
         self.frame_predictor.train()
+        self.MMFM.train()
         self.posterior.train()
         self.prior.train()
-        self.encoder.train()
-        self.decoder.train()
+        self.encoder_scene.train()
+        self.encoder_tactile.train()
+        self.decoder_scene.train()
+        self.decoder_tactile.train()
 
         plot_training_loss = []
         plot_validation_loss = []
@@ -252,10 +306,9 @@ class ModelTrainer:
                 if batch_features[1].shape[0] == batch_size:
                     images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
                     tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(device)
-                    scene_and_touch = torch.cat((tactile, images), 2)
                     action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
-                    mae, kld, predictions = self.run(scene_and_touch=scene_and_touch, actions=action, test=False)
-                    epoch_mae_losses += mae.item()
+                    mae_scene, mae_tactile, kld, predictions = self.run(scene=images, touch=tactile, actions=action, test=False)
+                    epoch_mae_losses += mae_scene.item()
                     epoch_kld_losses += kld.item()
                     if index:
                         mean_kld = epoch_kld_losses / index
@@ -264,16 +317,19 @@ class ModelTrainer:
                         mean_kld = 0.0
                         mean_mae = 0.0
 
-                    progress_bar.set_description("epoch: {}, ".format(epoch) + "MAE: {:.4f}, ".format(float(mae.item())) + "kld: {:.4f}, ".format(float(kld.item())) + "mean MAE: {:.4f}, ".format(mean_mae) + "mean kld: {:.4f}, ".format(mean_kld))
+                    progress_bar.set_description("epoch: {}, ".format(epoch) + "MAE: {:.4f}, ".format(float(mae_scene.item())) + "kld: {:.4f}, ".format(float(kld.item())) + "mean MAE: {:.4f}, ".format(mean_mae) + "mean kld: {:.4f}, ".format(mean_kld))
                     progress_bar.update()
 
             plot_training_loss.append([mean_mae, mean_kld])
 
             self.frame_predictor.eval()
+            self.MMFM.eval()
             self.posterior.eval()
             self.prior.eval()
-            self.encoder.eval()
-            self.decoder.eval()
+            self.encoder_scene.eval()
+            self.encoder_tactile.eval()
+            self.decoder_scene.eval()
+            self.decoder_tactile.eval()
 
             # Validation checking:
             val_mae_losses = 0.0
@@ -282,12 +338,10 @@ class ModelTrainer:
                 for index__, batch_features in enumerate(self.valid_full_loader):
                     if batch_features[1].shape[0] == batch_size:
                         images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
-                        tactile = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
-                        scene_and_touch = torch.cat((tactile, images), 2)
-                        action = batch_features[0].squeeze(-1).permute (1, 0, 2).to(device)
-                        val_mae, val_kld, predictions = self.run(scene_and_touch=scene_and_touch, actions=action, test=True)
-                        val_mae = self.mae_criterion(predictions[:,:3:,:,:], scene_and_touch[n_past:,:3:,:,:])
-                        val_mae_losses += val_mae.item()
+                        tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(device)
+                        action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
+                        val_mae_scene, val_mae_tact, val_kld, predictions = self.run(scene=images, touch=tactile, actions=action, test=True)
+                        val_mae_losses += val_mae_scene.item()
 
             plot_validation_loss.append(val_mae_losses / index__)
             print("Validation mae: {:.4f}, ".format(val_mae_losses / index__))
@@ -307,8 +361,8 @@ class ModelTrainer:
                 if best_val_loss > val_mae_losses / index__:
                     print("saving model")
                     # save the model
-                    torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
-                                'posterior': self.posterior, 'prior': self.prior, 'features': features}, model_save_path + "SVG_model")
+                    torch.save({'encoder_tactile': self.encoder_tactile, 'decoder_tactile': self.decoder_tactile, 'encoder_scene': self.encoder_scene, 'decoder_scene': self.decoder_scene,
+                                'frame_predictor': self.frame_predictor, 'posterior': self.posterior, 'prior': self.prior, 'MMFM': self.MMFM, 'features': features}, model_save_path + "STVG_MMFM_SE_SOP_TG_model")
 
                     best_val_loss = val_mae_losses / index__
                 early_stop_clock = 0

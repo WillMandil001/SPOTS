@@ -182,7 +182,7 @@ class ModelTrainer:
 
         state = actions[0].to(device)
         for index, (sample_sscene, sample_action) in enumerate(zip(scene[:-1], actions[1:])):
-            state_action = torch.cat((state, actions[index]), 1)
+            state_action = torch.cat((state, sample_action), 1)
 
             if index > n_past - 1:  # horizon
                 h, skip = self.encoder(x_pred)

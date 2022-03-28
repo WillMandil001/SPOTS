@@ -27,9 +27,9 @@ os.mkdir(model_save_path)
 
 lr = 0.001
 seed = 42
-mfreg = 0.1
+mfreg = 0.01
 seqlen = 20
-krireg = 0.1
+krireg = 0.01
 n_masks = 10
 indices = (0.9, 0.1)
 epochs = 100
@@ -128,6 +128,7 @@ class CDNATrainer():
                 progress_bar.set_description("epoch: {}, ".format(epoch) + "loss: {:.4f}, ".format(float(loss)) + "mean loss: {:.4f}, ".format(self.train_loss/(index+1)))
 
             # validation:
+            self.net.eval()
             with torch.no_grad():
                 for index, batch_features in enumerate(self.valid_full_loader):
                     val_max_index += 1
@@ -151,7 +152,6 @@ class CDNATrainer():
 
     def CDNA_pass_through(self, images, actions, validation=False):
         self.net.zero_grad()
-        self.optimizer.zero_grad()
 
         hidden = None
         outputs = []
