@@ -23,7 +23,7 @@ scaler_dir      = "/home/user/Robotics/Data_sets/PRI/single_object_purple/scalar
 
 # unique save title:
 model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
-# os.mkdir(model_save_path)
+os.mkdir(model_save_path)
 
 lr=0.0001
 beta1=0.9
@@ -43,13 +43,13 @@ dataset='smmnist'
 n_past=10
 n_future=10
 n_eval=20
-rnn_size=256*2
+rnn_size=256
 prior_rnn_layers=3
 posterior_rnn_layers=3
 predictor_rnn_layers=4
 state_action_size = 12
 z_dim=10  # number of latent variables
-g_dim=256*2  # 128
+g_dim=256  # 128
 beta=0.0001  # was 0.0001
 data_threads=5
 num_digits=2
@@ -67,7 +67,7 @@ features = [lr, beta1, batch_size, log_dir, model_dir, name, data_root, optimize
 torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # use gpu if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")#  use gpu if available
 
 
 class BatchGenerator:
@@ -106,7 +106,7 @@ class FullDataSet:
         tactile_data = np.load(train_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
-            tactile_images.append(create_image(tactile_data_sample))
+            tactile_images.append(create_image(tactile_data_sample[0], tactile_data_sample[1], tactile_data_sample[2]))
 
         images = []
         for image_name in np.load(train_data_dir + value[2]):
@@ -117,9 +117,18 @@ class FullDataSet:
         return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), experiment_number, time_steps]
 
 
-def create_image(tactile):
+def create_image(tactile_x, tactile_y, tactile_z):
     # convert tactile data into an image:
-    return cv2.resize(tactile.reshape(3, 4, 4).astype(np.float32), dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
+    image = np.zeros((4, 4, 3), np.float32)
+    index = 0
+    for x in range(4):
+        for y in range(4):
+            image[x][y] =  [tactile_x[index],
+                            tactile_y[index],
+                            tactile_z[index]]
+            index += 1
+    reshaped_image = np.rot90(cv2.resize(image.astype(np.float32), dsize=(64, 64), interpolation=cv2.INTER_CUBIC), k=1, axes=(0, 1))
+    return reshaped_image
 
 
 class ModelTrainer:
@@ -251,7 +260,7 @@ class ModelTrainer:
             for index, batch_features in enumerate(self.train_full_loader):
                 if batch_features[1].shape[0] == batch_size:
                     images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
-                    tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(device)
+                    tactile = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
                     scene_and_touch = torch.cat((tactile, images), 2)
                     action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
                     mae, kld, predictions = self.run(scene_and_touch=scene_and_touch, actions=action, test=False)

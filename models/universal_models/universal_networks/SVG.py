@@ -4,7 +4,8 @@ import os
 import csv
 import cv2
 import copy
-import utils
+# from utils import init_weights
+import universal_networks.utils as utility_prog
 import numpy as np
 
 from tqdm import tqdm
@@ -57,19 +58,20 @@ class Model:
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
 
-        import models.lstm as lstm_models
-        self.frame_predictor = lstm_models.lstm(self.g_dim + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
-        self.posterior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
-        self.prior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
-        self.frame_predictor.apply(utils.init_weights)
-        self.posterior.apply(utils.init_weights)
-        self.prior.apply(utils.init_weights)
+        from universal_networks.lstm import lstm
+        from universal_networks.lstm import gaussian_lstm
+        self.frame_predictor = lstm(self.g_dim + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        self.posterior = gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
+        self.prior = gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
+        self.frame_predictor.apply(utility_prog.init_weights)
+        self.posterior.apply(utility_prog.init_weights)
+        self.prior.apply(utility_prog.init_weights)
 
-        import models.dcgan_64 as model
+        import universal_networks.dcgan_64 as model
         self.encoder = model.encoder(self.g_dim, self.channels)
         self.decoder = model.decoder(self.g_dim, self.channels)
-        self.encoder.apply(utils.init_weights)
-        self.decoder.apply(utils.init_weights)
+        self.encoder.apply(utility_prog.init_weights)
+        self.decoder.apply(utility_prog.init_weights)
 
         self.frame_predictor_optimizer = self.optimizer(self.frame_predictor.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.posterior_optimizer = self.optimizer(self.posterior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
@@ -88,8 +90,7 @@ class Model:
 
     def save_model(self):
         torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
-                    'posterior': self.posterior, 'prior': self.prior, 'features': self.features},
-                    self.model_dir + "SVG_model")
+                    'posterior': self.posterior, 'prior': self.prior, 'features': self.features}, self.model_dir + "SVG_model")
 
     def set_train(self):
         self.frame_predictor.train()

@@ -11,10 +11,11 @@ from torch.utils.data import Dataset
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torchvision
 
-from universal_models.SVG import Model as SVG
+from universal_networks.SVG import Model as SVG
+from universal_networks.SVG_tactile_enhanced import Model as SVG_TE
+from universal_networks.SPOTS_SVG_ACTP import Model as SPOTS_SVG_ACTP
 
 
 class BatchGenerator:
@@ -40,7 +41,7 @@ class BatchGenerator:
 
 
 class FullDataSet:
-    def __init__(self, data_map, train=False, validation=False, train_percentage=1.0, image_size=[64,64]):
+    def __init__(self, data_map, train=False, validation=False, train_percentage=1.0, image_size=64):
         self.image_size = image_size
         if train:
             self.samples = data_map[1:int((len(data_map) * train_percentage))]
@@ -58,7 +59,7 @@ class FullDataSet:
         tactile_data = np.load(train_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
-            tactile_images.append(create_image(tactile_data_sample[0], tactile_data_sample[1], tactile_data_sample[2], self.image_size))
+            tactile_images.append(create_image(tactile_data_sample, image_size=self.image_size))
 
         images = []
         for image_name in np.load(train_data_dir + value[2]):
@@ -66,18 +67,20 @@ class FullDataSet:
 
         experiment_number = np.load(train_data_dir + value[3])
         time_steps = np.load(train_data_dir + value[4])
-        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), experiment_number, time_steps]
+        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps]
 
 
-def create_image(tactile_x, tactile_y, tactile_z, image_size):
+def create_image(tactile, image_size):
     # convert tactile data into an image:
     image = np.zeros((4, 4, 3), np.float32)
     index = 0
     for x in range(4):
         for y in range(4):
-            image[x][y] = [tactile_x[index], tactile_y[index], tactile_z[index]]
+            image[x][y] = [tactile[0][index],
+                           tactile[1][index],
+                           tactile[2][index]]
             index += 1
-    reshaped_image = cv2.resize(image.astype(np.float32), dsize=(image_size[0], image_size[1]), interpolation=cv2.INTER_CUBIC)
+    reshaped_image = cv2.resize(image.astype(np.float32), dsize=(image_size, image_size), interpolation=cv2.INTER_CUBIC)
     return reshaped_image
 
 
@@ -117,9 +120,19 @@ class UniversalModelTrainer:
         self.model_name = features["model_name"]
         self.train_data_dir = features["train_data_dir"]
         self.scaler_dir = features["scaler_dir"]
+        self.training_stages = features["training_stages"]
+        self.training_stages_epochs = features["training_stages_epochs"]
+        self.tactile_size = features["tactile_size"]
+        self.stage = self.training_stages[0]
+
+        self.gain = 0.0
 
         if model_name == "SVG":
             self.model = SVG(features)
+        elif model_name == "SVG_TE":
+            self.model = SVG_TE(features)
+        elif model_name == "SPOTS_SVG_ACTP":
+            self.model = SPOTS_SVG_ACTP(features)
 
         BG = BatchGenerator(self.train_percentage, self.train_data_dir, self.batch_size, self.image_width)
         self.train_full_loader, self.valid_full_loader = BG.load_full_data()
@@ -137,15 +150,26 @@ class UniversalModelTrainer:
         early_stop_clock = 0
         progress_bar = tqdm(range(0, epochs), total=(epochs*len(self.train_full_loader)))
         for epoch in progress_bar:
+            if epoch <= self.training_stages_epochs[0]:
+                self.stage = self.training_stages[0]
+            elif epoch <= self.training_stages_epochs[1]:
+                self.stage = self.training_stages[1]
+            elif epoch <= self.training_stages_epochs[2]:
+                self.stage = self.training_stages[2]
+
             self.model.set_train()
 
             epoch_mae_losses = 0.0
             epoch_kld_losses = 0.0
             for index, batch_features in enumerate(self.train_full_loader):
+
+                if self.stage == "scene_loss_plus_tactile_gradual_increase":
+                    gain += 0.00001
+                    if gain > 0.01:
+                        gain = 0.01
+
                 if batch_features[1].shape[0] == batch_size:
-                    images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
-                    action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
-                    mae, kld, predictions = self.model.run(scene=images, actions=action, test=False)
+                    mae, kld, mae_tactile, predictions = self.format_and_run_batch(batch_features, test=False)
                     epoch_mae_losses += mae.item()
                     epoch_kld_losses += kld.item()
                     if index:
@@ -167,9 +191,7 @@ class UniversalModelTrainer:
             with torch.no_grad():
                 for index__, batch_features in enumerate(self.valid_full_loader):
                     if batch_features[1].shape[0] == batch_size:
-                        images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
-                        action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
-                        val_mae, val_kld, predictions = self.model.run(scene=images, actions=action, test=True)
+                        val_mae, val_kld, mae_tactile, predictions = self.format_and_run_batch(batch_features, test=True)
                         val_mae_losses += val_mae.item()
 
             plot_validation_loss.append(val_mae_losses / index__)
@@ -190,53 +212,109 @@ class UniversalModelTrainer:
                 if best_val_loss > val_mae_losses / index__:
                     print("saving model")
                     # save the model
-                    self.model.save_model()
+                    if self.stage != "":
+                        self.model.save_model(self.stage)
+                    else:
+                        self.model.save_model()
                     best_val_loss = val_mae_losses / index__
                 early_stop_clock = 0
                 previous_val_mean_loss = val_mae_losses / index__
 
+    def format_and_run_batch(self, batch_features, test):
+        mae, kld, mae_tactile, predictions = None, None, None, None
+        if self.model_name == "SVG":
+            images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
+            action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
+            mae, kld, predictions = self.model.run(scene=images, actions=action, test=test)
+
+        elif self.model_name == "SVG_TE":
+            images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
+            tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(device)
+            scene_and_touch = torch.cat((tactile, images), 2)
+            action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
+            mae, kld, predictions = self.model.run(scene_and_touch=scene_and_touch, actions=action, test=test)
+
+        elif self.model_name == "SPOTS_SVG_ACTP":
+            action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(device)
+            images = batch_features[1].permute(1, 0, 4, 3, 2).to(device)
+            tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(device), start_dim=2)
+            mae, kld, mae_tactile, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
+
+        return mae, kld, mae_tactile, predictions
+
 
 if __name__ == "__main__":
-    model_save_path = "/home/wmandil/Robotics/SPOTS/SPOTS/models/SVG/saved_models/PRI_object1_motion1_SVG_"
-    train_data_dir = "/home/wmandil/Robotics/Data_sets/PRI/object1_motion1/train_formatted/"
-    scaler_dir = "/home/wmandil/Robotics/Data_sets/PRI/object1_motion1/scalars/"
+    model_save_path = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/"
+    train_data_dir = "/home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted/"
+    scaler_dir = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/"
+
+    # model names: SVG, SVG_TE, SPOTS_SVG_ACTP
+    model_name = "SPOTS_SVG_ACTP"
 
     # unique save title:
-    model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
-    os.mkdir(model_save_path)
+    model_save_path = model_save_path + model_name
+    try:
+        os.mkdir(model_save_path)
+    except FileExistsError or FileNotFoundError:
+        pass
+    try:
+        model_save_path = model_save_path + "/model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
+        os.mkdir(model_save_path)
+    except FileExistsError or FileNotFoundError:
+        pass
 
     lr = 0.0001
     beta1 = 0.9
     batch_size = 32
     log_dir = 'logs/lp'
     model_dir = model_save_path
-    data_root = 'data'
+    data_root = train_data_dir
     optimizer = 'adam'
     niter = 300
     seed = 1
     image_width = 64
-    channels = 3
-    out_channels = 3
-    dataset = 'smmnist'
+    dataset = 'object1_motion1'
     n_past = 10
     n_future = 10
     n_eval = 20
-    rnn_size = 256
     prior_rnn_layers = 3
     posterior_rnn_layers = 3
     predictor_rnn_layers = 4
     state_action_size = 12
     z_dim = 10  # number of latent variables
-    g_dim = 256  # 128
     beta = 0.0001  # was 0.0001
     data_threads = 5
     num_digits = 2
     last_frame_skip = 'store_true'
-    epochs = 100
+    epochs = 125
     train_percentage = 0.9
     validation_percentage = 0.1
     criterion = "L1"
-    model_name = "SVG"
+    tactile_size = None
+
+    if model_name == "SVG":
+        g_dim = 256  # 128
+        rnn_size = 256
+        channels = 3
+        out_channels = 3
+        training_stages = [""]
+        training_stages_epochs = [epochs]
+    elif model_name == "SVG_TE":
+        g_dim = 256 * 2
+        rnn_size = 256 * 2
+        channels = 6
+        out_channels = 6
+        training_stages = [""]
+        training_stages_epochs = [epochs]
+        tactile_size = [image_width, image_width]
+    elif model_name == "SPOTS_SVG_ACTP":
+        g_dim = 256
+        rnn_size = 256
+        channels = 3
+        out_channels = 3
+        training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
+        training_stages_epochs = [50, 75, 125]
+        tactile_size = 48
 
     torch.manual_seed(seed)
     torch.backends.cudnn.benchmark = False
@@ -245,14 +323,14 @@ if __name__ == "__main__":
 
     features = {"lr": lr, "beta1": beta1, "batch_size": batch_size, "log_dir": log_dir, "model_dir": model_dir, "data_root": data_root, "optimizer": optimizer, "niter": niter, "seed": seed,
                 "image_width": image_width, "channels": channels, "out_channels": out_channels, "dataset": dataset, "n_past": n_past, "n_future": n_future, "n_eval": n_eval, "rnn_size": rnn_size, "prior_rnn_layers": prior_rnn_layers,
-                "posterior_rnn_layers": posterior_rnn_layers, "predictor_rnn_layers": predictor_rnn_layers, "z_dim": z_dim, "g_dim": g_dim, "beta": beta, "data_threads": data_threads, "num_digits": num_digits,
+                "posterior_rnn_layers": posterior_rnn_layers, "predictor_rnn_layers": predictor_rnn_layers, "state_action_size": state_action_size, "z_dim": z_dim, "g_dim": g_dim, "beta": beta, "data_threads": data_threads, "num_digits": num_digits,
                 "last_frame_skip": last_frame_skip, "epochs": epochs, "train_percentage": train_percentage, "validation_percentage": validation_percentage, "criterion": criterion, "model_name": model_name,
-                "train_data_dir": train_data_dir, "scaler_dir": scaler_dir, "device": device}
+                "train_data_dir": train_data_dir, "scaler_dir": scaler_dir, "device": device, "training_stages":training_stages, "training_stages_epochs": training_stages_epochs, "tactile_size":tactile_size}
 
     # save features
     w = csv.writer(open(model_save_path + "/features.csv", "w"))
     for key, val in features.items():
         w.writerow([key, val])
 
-    UMT = UniversalModelTrainer(model_name, features)
+    UMT = UniversalModelTrainer(features)
     UMT.train_full_model()
