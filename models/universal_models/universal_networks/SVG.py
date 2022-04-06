@@ -58,6 +58,26 @@ class Model:
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
 
+    def load_model(self, full_model):
+        self.optimizer = optim.Adam
+        self.frame_predictor = full_model["frame_predictor"]
+        self.posterior = full_model["posterior"]
+        self.prior = full_model["prior"]
+        self.encoder = full_model["encoder"]
+        self.decoder = full_model["decoder"]
+
+        self.mae_criterion = nn.L1Loss()
+
+        self.frame_predictor.cuda()
+        self.posterior.cuda()
+        self.prior.cuda()
+        self.encoder.cuda()
+        self.decoder.cuda()
+        self.mae_criterion.cuda()
+
+        self.criterion = nn.L1Loss()
+
+    def initialise_model(self):
         from universal_networks.lstm import lstm
         from universal_networks.lstm import gaussian_lstm
         self.frame_predictor = lstm(self.g_dim + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)

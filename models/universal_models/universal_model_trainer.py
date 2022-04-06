@@ -134,6 +134,8 @@ class UniversalModelTrainer:
         elif model_name == "SPOTS_SVG_ACTP":
             self.model = SPOTS_SVG_ACTP(features)
 
+        self.model.initialise_model()
+
         BG = BatchGenerator(self.train_percentage, self.train_data_dir, self.batch_size, self.image_width)
         self.train_full_loader, self.valid_full_loader = BG.load_full_data()
 
@@ -249,7 +251,7 @@ if __name__ == "__main__":
     scaler_dir = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/"
 
     # model names: SVG, SVG_TE, SPOTS_SVG_ACTP
-    model_name = "SPOTS_SVG_ACTP"
+    model_name = "SVG"
 
     # unique save title:
     model_save_path = model_save_path + model_name
