@@ -105,7 +105,7 @@ class SSIM (torch.nn.Module):
         self.window = create_window (window_size, self.channel)
 
     def forward(self, img1, img2):
-        (_, channel, _, _) = img1.size ()
+        (_, channel, _, _) = img1.size()
 
         if channel == self.channel and self.window.data.type () == img1.data.type ():
             window = self.window
@@ -195,17 +195,22 @@ def create_image(tactile, image_size):
 
 
 class UniversalTester():
-    def __init__(self, data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage):
+    def __init__(self, data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, quant_test):
         self.scene_loss_titles = ["Scene MAE: ", "Scene MAE T1: ", "Scene MAE T5: ", "Scene MAE T10: ",
                                   "Scene MSE: ", "Scene MSE T1: ", "Scene MSE T5: ", "Scene MSE T10: ",
-                                  "Scene PSNR: ", "Scene PSNR T1: ", "Scene PSNR T5: ", "Scene PSNR T10: "]
+                                  "Scene PSNR: ", "Scene PSNR T1: ", "Scene PSNR T5: ", "Scene PSNR T10: ",
+                                  "Scene SSIM: ", "Scene SSIM T1: ", "Scene SSIM T5: ", "Scene SSIM T10: "]
         self.tactile_loss_titles = ["Tactile MAE: ", "Tactile MAE T1: ", "Tactile MAE T5: ", "Tactile MAE T10: ", "Tactile MAE Shear X: ", "Tactile MAE Shear Y: ", "Tactile MAE Normal Z: ",
                                     "Tactile MSE: ", "Tactile MSE T1: ", "Tactile MSE T5: ", "Tactile MSE T10: ", "Tactile MSE Shear X: ", "Tactile MSE Shear Y: ", "Tactile MSE Normal Z: ",
-                                    "Tactile PSNR: ", "Tactile PSNR T1: ", "Tactile PSNR T5: ", "Tactile PSNR T10: ", "Tactile PSNR Shear X: ", "Tactile PSNR Shear Y: ", "Tactile PSNR Normal Z: "]
+                                    "Tactile PSNR: ", "Tactile PSNR T1: ", "Tactile PSNR T5: ", "Tactile PSNR T10: ", "Tactile PSNR Shear X: ", "Tactile PSNR Shear Y: ", "Tactile PSNR Normal Z: ",
+                                    "Tactile SSIM: ", "Tactile SSIM T1: ", "Tactile SSIM T5: ", "Tactile SSIM T10: ", "Tactile SSIM Shear X: ", "Tactile SSIM Shear Y: ", "Tactile SSIM Normal Z: "]
 
         self.scaler_dir = scaler_dir
+        self.quant_test = quant_test
         self.model_stage = model_stage
         self.test_data_dir = test_data_dir
+        self.qual_analysis = qual_analysis
+        self.quant_analysis = quant_analysis
         self.data_save_path = data_save_path
         self.model_save_path = model_save_path
         self.test_folder_name = test_folder_name
@@ -272,7 +277,10 @@ class UniversalTester():
         self.test_full_loader = BG.load_data()
 
         # test dataset
-        self.test_model()
+        if self.quant_analysis == True:
+            self.test_model()
+        if self.qual_analysis == True:
+            self.test_model_qualitative()
 
     def test_model(self):
         self.gain = None
@@ -310,23 +318,53 @@ class UniversalTester():
                 f.write ('\n')
         print(np.array(self.performance_data_scene_average + self.performance_data_tactile_average))
 
-    # def test_qualitative(self):
-    #     for i in range(10):
-    #         plt.figure(1)
-    #         f, axarr = plt.subplots(1, 2)
-    #         axarr[0].set_title("predictions: t_" + str(i))
-    #         axarr[0].imshow(np.array(predictions[i][7].permute(1, 2, 0).cpu().detach()))
-    #         axarr[1].set_title("ground truth: t_" + str(i))
-    #         axarr[1].imshow(np.array(images[context_frames + i][7].permute(1, 2, 0).cpu().detach()))
-    #         plt.savefig(data_save_path + str(i) + ".png")
+    def test_model_qualitative(self):
+        self.model.set_test()
 
-    def format_and_run_batch(self, batch_features, test):
+        qual_save_path = self.model_save_path + "qualitative_analysis/"
+        try:
+            os.mkdir(qual_save_path)
+        except FileExistsError or FileNotFoundError:
+            pass
+
+        qual_save_path = self.model_save_path + "qualitative_analysis/" + self.test_folder_name + "/"
+        try:
+            os.mkdir(qual_save_path)
+        except FileExistsError or FileNotFoundError:
+            pass
+
+        with torch.no_grad():
+            for index, batch_features in enumerate(self.test_full_loader):
+                if batch_features[1].shape[0] == self.batch_size:
+                    predictions, tactile_predictions, images, tactile = self.format_and_run_batch(batch_features, test=True, qualitative=True)
+
+                    if index in self.quant_test[:,0]:
+                        list_of_sub_batch_trials_to_test = [i[1] for i in self.quant_test if i[0] == index]
+                        for test_trial in list_of_sub_batch_trials_to_test:
+                            sequence_save_path = self.model_save_path + "qualitative_analysis/" + self.test_folder_name + "/" + "batch_" + str(index) + "sub_batch_" + str(test_trial) + "/"
+                            try:
+                                os.mkdir(sequence_save_path)
+                            except FileExistsError or FileNotFoundError:
+                                pass
+
+                            for i in range(self.n_future):
+                                plt.figure(1)
+                                f, axarr = plt.subplots(1, 2)
+                                axarr[0].set_title("predictions: t_" + str(i))
+                                axarr[0].imshow(np.array(predictions[i][test_trial].permute(1, 2, 0).cpu().detach()))
+                                axarr[1].set_title("ground truth: t_" + str(i))
+                                axarr[1].imshow(np.array(images[i][test_trial].permute(1, 2, 0).cpu().detach()))
+                                plt.savefig(sequence_save_path + "scene_time_step_" + str(i) + ".png")
+
+
+    def format_and_run_batch(self, batch_features, test, qualitative=False):
         mae, kld, mae_tactile, predictions, tactile_predictions = None, None, None, None, None
         if self.model_name == "SVG":
             images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, kld, predictions = self.model.run(scene=images, actions=action, test=test)
-            scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
 
         elif self.model_name == "SVG_TE":
             images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
@@ -334,51 +372,64 @@ class UniversalTester():
             scene_and_touch = torch.cat((tactile, images), 2)
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, kld, predictions = self.model.run(scene_and_touch=scene_and_touch, actions=action, test=test)
-            scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
+            predictions = predictions[:,:,3:,:,:]
+            tactile_predictions = predictions[:,:,:3,:,:]
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
 
         elif self.model_name == "SPOTS_SVG_ACTP" or self.model_name == "SPOTS_SVG_ACTP_BEST" or self.model_name == "SPOTS_SVG_ACTP_stage1" or self.model_name == "SPOTS_SVG_ACTP_stage2" or self.model_name == "SPOTS_SVG_ACTP_stage3":
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
             mae, kld, mae_tactile, predictions, tactile_predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
-            scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
+
+        if qualitative:
+            return predictions, tactile_predictions, images, tactile
 
         return scene_MAE, tactile_MAE, predictions, tactile_predictions
 
     def calculate_losses(self, groundtruth_scene, prediction_scene, groundtruth_tactile=None, predictions_tactile=None):
         scene_losses, tactile_losses = [],[]
-
-        for criterion in [nn.L1Loss(), nn.MSELoss(), PSNR()]:  #, SSIM(window_size=self.image_width)]:
-            # scene:
-            scene_losses.append(criterion(prediction_scene, groundtruth_scene).cpu().detach().data)
+        # scene:
+        for criterion in [nn.L1Loss(), nn.MSELoss(), PSNR(), SSIM(window_size=self.image_width)]:  #, SSIM(window_size=self.image_width)]:
+            batch_loss = []
+            for i in range(prediction_scene.shape[0]):
+                batch_loss.append(criterion(prediction_scene[i], groundtruth_scene[i]).cpu().detach().data)
+            scene_losses.append(sum(batch_loss) / len(batch_loss))
             scene_losses.append(criterion(prediction_scene[0], groundtruth_scene[0]).cpu().detach().data)
             scene_losses.append(criterion(prediction_scene[4], groundtruth_scene[4]).cpu().detach().data)
             scene_losses.append(criterion(prediction_scene[9], groundtruth_scene[9]).cpu().detach().data)
-            # tactile:
+        # tactile:
         if groundtruth_tactile is not None:
             if self.tactile_size == 48:
                 criterions = [nn.L1Loss(), nn.MSELoss()]
             else:
-                criterions = [nn.L1Loss (), nn.MSELoss (), PSNR ()]
-
+                criterions = [nn.L1Loss (), nn.MSELoss (), PSNR (), SSIM(window_size=self.image_width)]
             for criterion in criterions:
-                tactile_losses.append(criterion(prediction_scene, groundtruth_scene).cpu().detach().data)
-                tactile_losses.append(criterion(prediction_scene[0], groundtruth_scene[0]).cpu().detach().data)
-                tactile_losses.append(criterion(prediction_scene[4], groundtruth_scene[4]).cpu().detach().data)
-                tactile_losses.append(criterion(prediction_scene[9], groundtruth_scene[9]).cpu().detach().data)
-                tactile_losses.append(criterion(prediction_scene[:,:,0], groundtruth_scene[:,:,0]).cpu().detach().data)  # Shear X
-                tactile_losses.append(criterion(prediction_scene[:,:,1], groundtruth_scene[:,:,1]).cpu().detach().data)  # Shear Y
-                tactile_losses.append(criterion(prediction_scene[:,:,2], groundtruth_scene[:,:,2]).cpu().detach().data)  # Normal Z
+                batch_loss = []
+                for i in range(prediction_scene.shape[0]):
+                    batch_loss.append(criterion(prediction_scene[i], groundtruth_scene[i]).cpu().detach().data)
+                tactile_losses.append(sum(batch_loss) / len(batch_loss))
+                tactile_losses.append(criterion(predictions_tactile[0], groundtruth_tactile[0]).cpu().detach().data)
+                tactile_losses.append(criterion(predictions_tactile[4], groundtruth_tactile[4]).cpu().detach().data)
+                tactile_losses.append(criterion(predictions_tactile[9], groundtruth_tactile[9]).cpu().detach().data)
+                tactile_losses.append(criterion(predictions_tactile[:,:,0], groundtruth_tactile[:,:,0]).cpu().detach().data)  # Shear X
+                tactile_losses.append(criterion(predictions_tactile[:,:,1], groundtruth_tactile[:,:,1]).cpu().detach().data)  # Shear Y
+                tactile_losses.append(criterion(predictions_tactile[:,:,2], groundtruth_tactile[:,:,2]).cpu().detach().data)  # Normal Z
 
         print(scene_losses, tactile_losses)
         return scene_losses, tactile_losses
 
 @click.command()
-@click.option('--model_name', type=click.Path(), default="SPOTS_SVG_ACTP", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
-@click.option('--model_stage', type=click.Path(), default="BEST", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
-@click.option('--model_folder_name', type=click.Path(), default="model_07_04_2022_12_14", help='Folder name where the model is stored')  # model_06_04_2022_16_39
+@click.option('--model_name', type=click.Path(), default="SVG_TE", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
+@click.option('--model_stage', type=click.Path(), default="", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
+@click.option('--model_folder_name', type=click.Path(), default="model_07_04_2022_13_28", help='Folder name where the model is stored')
 @click.option('--test_folder_name', type=click.Path(), default="test_no_new_formatted", help='Folder name where the test data is stored, test_no_new_formatted, test_novel_formatted')
-def main(model_name, model_stage, model_folder_name, test_folder_name):
+@click.option('--quant_analysis', type=click.BOOL, default=False, help='Perform quantitative analysis on the test data')
+@click.option('--qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
+def main(model_name, model_stage, model_folder_name, test_folder_name, quant_analysis, qual_analysis):
     # model names: SVG, SVG_TE, SPOTS_SVG_ACTP
     model_save_path = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/" + model_name + "/" + model_folder_name + "/"
     test_data_dir  = "/home/user/Robotics/Data_sets/PRI/object1_motion1/" + test_folder_name + "/"
@@ -395,7 +446,10 @@ def main(model_name, model_stage, model_folder_name, test_folder_name):
     else:
         model_save_name = model_name + "_model"
 
-    MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage)
+    # [batch, trial]
+    quant_test = np.array([[1,3], [1,5], [2,4], [3,1], [4,3], [5,6], [6,5], [7,4]])
+
+    MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, quant_test)
 
 
 if __name__ == '__main__':

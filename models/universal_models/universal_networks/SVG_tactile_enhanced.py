@@ -143,7 +143,7 @@ class Model:
     def save_model(self):
         torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
                     'posterior': self.posterior, 'prior': self.prior, 'features': self.features},
-                    self.model_dir + "SVG_model")
+                    self.model_dir + "SVG_TE_model")
 
     def set_train(self):
         self.frame_predictor.train()
