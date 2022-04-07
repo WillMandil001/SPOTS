@@ -58,15 +58,18 @@ class Model:
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
 
+        if self.criterion == "L1":
+            self.mae_criterion = nn.L1Loss()
+        if self.criterion == "L2":
+            self.mae_criterion = nn.MSELoss()
+
+
     def load_model(self, full_model):
-        self.optimizer = optim.Adam
         self.frame_predictor = full_model["frame_predictor"]
         self.posterior = full_model["posterior"]
         self.prior = full_model["prior"]
         self.encoder = full_model["encoder"]
         self.decoder = full_model["decoder"]
-
-        self.mae_criterion = nn.L1Loss()
 
         self.frame_predictor.cuda()
         self.posterior.cuda()
@@ -74,8 +77,6 @@ class Model:
         self.encoder.cuda()
         self.decoder.cuda()
         self.mae_criterion.cuda()
-
-        self.criterion = nn.L1Loss()
 
     def initialise_model(self):
         from universal_networks.lstm import lstm
@@ -98,8 +99,6 @@ class Model:
         self.prior_optimizer = self.optimizer(self.prior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.encoder_optimizer = self.optimizer(self.encoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.decoder_optimizer = self.optimizer(self.decoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-
-        self.mae_criterion = nn.L1Loss()
 
         self.frame_predictor.cuda()
         self.posterior.cuda()

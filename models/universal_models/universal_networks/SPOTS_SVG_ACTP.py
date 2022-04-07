@@ -58,8 +58,41 @@ class Model:
         self.training_stages_epochs = features["training_stages_epochs"]
         self.tactile_size = features["tactile_size"]
 
-        self.optimizer = optim.Adam
+        if self.optimizer == "adam" or self.optimizer == "Adam":
+            self.optimizer = optim.Adam
 
+        if self.criterion == "L1":
+            self.mae_criterion = nn.L1Loss()
+            self.mae_criterion_scene = nn.L1Loss()
+            self.mae_criterion_tactile = nn.L1Loss()
+        if self.criterion == "L2":
+            self.mae_criterion = nn.MSELoss()
+            self.mae_criterion_scene = nn.MSELoss()
+            self.mae_criterion_tactile = nn.MSELoss()
+
+    def load_model(self, full_model):
+        self.frame_predictor_tactile = full_model["frame_predictor_tactile"]
+        self.frame_predictor_scene = full_model["frame_predictor_scene"]
+        self.posterior = full_model["posterior"]
+        self.prior = full_model["prior"]
+        self.encoder_scene = full_model["encoder_scene"]
+        self.decoder_scene = full_model["decoder_scene"]
+        self.MMFM_scene = full_model["MMFM_scene"]
+        self.MMFM_tactile = full_model["MMFM_tactile"]
+
+
+        self.frame_predictor_tactile.cuda()
+        self.frame_predictor_scene.cuda()
+        self.posterior.cuda()
+        self.prior.cuda()
+        self.encoder_scene.cuda()
+        self.decoder_scene.cuda()
+        self.MMFM_scene.cuda()
+        self.MMFM_tactile.cuda()
+        self.mae_criterion_scene.cuda()
+        self.mae_criterion_tactile.cuda()
+
+    def initialise_model(self):
         import universal_networks.dcgan_64 as model
         import universal_networks.lstm as lstm_models
         import universal_networks.ACTP as ACTP_model
@@ -83,8 +116,6 @@ class Model:
         self.encoder_optimizer_scene = self.optimizer(self.encoder_scene.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.decoder_optimizer_scene = self.optimizer(self.decoder_scene.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
-        self.mae_criterion_scene = nn.L1Loss()
-
         self.frame_predictor_scene.cuda()
         self.encoder_scene.cuda()
         self.decoder_scene.cuda()
@@ -100,7 +131,6 @@ class Model:
         self.MMFM_tactile.cuda()
 
         self.frame_predictor_optimizer_tactile = self.optimizer(self.frame_predictor_tactile.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        self.mae_criterion_tactile = nn.L1Loss()
         self.frame_predictor_tactile.cuda()
         self.mae_criterion_tactile.cuda()
 
@@ -114,12 +144,14 @@ class Model:
         self.posterior.cuda()
         self.prior.cuda()
 
+
     def run(self, scene, tactile, actions, gain, test=False, stage=False):
         mae_tactile = 0
         kld_tactile = 0
         mae_scene = 0
         kld_scene = 0
-        outputs = []
+        outputs_scene = []
+        outputs_tactile = []
 
         # scene
         self.frame_predictor_scene.zero_grad()
@@ -177,7 +209,8 @@ class Model:
                 mae_scene += self.mae_criterion_scene(x_pred_scene, scene[index + 1])  # prediction model
                 kld_scene += self.kl_criterion_scene(mu, logvar, mu_p, logvar_p)  # learned prior
 
-                outputs.append(x_pred_scene)
+                outputs_tactile.append(x_pred_tactile)
+                outputs_scene.append(x_pred_scene)
 
             else:  # context
                 # Scene Encoding
@@ -212,9 +245,11 @@ class Model:
                 mae_scene += self.mae_criterion_scene(x_pred_scene, scene[index + 1])  # prediction model
                 kld_scene += self.kl_criterion_scene(mu, logvar, mu_p, logvar_p)  # learned prior
 
-                last_output = x_pred_scene
+                last_output_scene = x_pred_scene
+                last_output_tactile = x_pred_tactile
 
-        outputs = [last_output] + outputs
+        outputs_scene = [last_output_scene] + outputs_scene
+        outputs_tactile = [last_output_tactile] + outputs_tactile
 
         if test is False:
             if stage == "scene_only":
@@ -258,7 +293,7 @@ class Model:
                 self.prior_optimizer.step()
 
         return mae_scene.data.cpu().numpy() / (self.n_past + self.n_future), kld_scene.data.cpu().numpy() / (self.n_future + self.n_past), \
-               mae_tactile.cpu().data.numpy() / (self.n_past + self.n_future), torch.stack(outputs)
+               mae_tactile.cpu().data.numpy() / (self.n_past + self.n_future), torch.stack(outputs_scene), torch.stack(outputs_tactile)
 
     def kl_criterion_scene(self, mu1, logvar1, mu2, logvar2):
         sigma1 = logvar1.mul(0.5).exp()
@@ -298,13 +333,13 @@ class Model:
 
     def save_model(self, stage):
         if stage == "best":
-            save_name = "SVG_SPOTS_3S_SOP_BEST"
+            save_name = "SPOTS_SVG_ACTP_BEST"
         elif stage == "scene_only":
-            save_name = "SVG_SPOTS_3S_SOP_stage1"
+            save_name = "SPOTS_SVG_ACTP_stage1"
         elif stage == "tactile_loss_plus_scene_fixed":
-            save_name = "SVG_SPOTS_3S_SOP_stage2"
+            save_name = "SPOTS_SVG_ACTP_stage2"
         elif stage == "scene_loss_plus_tactile_gradual_increase":
-            save_name = "SVG_SPOTS_3S_SOP_stage3"
+            save_name = "SPOTS_SVG_ACTP_stage3"
 
         torch.save({"frame_predictor_tactile": self.frame_predictor_tactile,
                     "frame_predictor_scene": self.frame_predictor_scene, "encoder_scene": self.encoder_scene,
