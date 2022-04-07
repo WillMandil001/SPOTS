@@ -336,6 +336,7 @@ class UniversalTester():
         with torch.no_grad():
             for index, batch_features in enumerate(self.test_full_loader):
                 if batch_features[1].shape[0] == self.batch_size:
+                    print(index)
                     predictions, tactile_predictions, images, tactile = self.format_and_run_batch(batch_features, test=True, qualitative=True)
 
                     if index in self.quant_test[:,0]:
@@ -355,7 +356,7 @@ class UniversalTester():
                                 axarr[1].set_title("ground truth: t_" + str(i))
                                 axarr[1].imshow(np.array(images[i][test_trial].permute(1, 2, 0).cpu().detach()))
                                 plt.savefig(sequence_save_path + "scene_time_step_" + str(i) + ".png")
-
+                                plt.close('all')
 
     def format_and_run_batch(self, batch_features, test, qualitative=False):
         mae, kld, mae_tactile, predictions, tactile_predictions = None, None, None, None, None
@@ -425,7 +426,7 @@ class UniversalTester():
 @click.command()
 @click.option('--model_name', type=click.Path(), default="SVG_TE", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
 @click.option('--model_stage', type=click.Path(), default="", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
-@click.option('--model_folder_name', type=click.Path(), default="model_07_04_2022_13_28", help='Folder name where the model is stored')
+@click.option('--model_folder_name', type=click.Path(), default="model_07_04_2022_16_00", help='Folder name where the model is stored')
 @click.option('--test_folder_name', type=click.Path(), default="test_no_new_formatted", help='Folder name where the test data is stored, test_no_new_formatted, test_novel_formatted')
 @click.option('--quant_analysis', type=click.BOOL, default=False, help='Perform quantitative analysis on the test data')
 @click.option('--qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
@@ -447,7 +448,20 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, quant_ana
         model_save_name = model_name + "_model"
 
     # [batch, trial]
-    quant_test = np.array([[1,3], [1,5], [2,4], [3,1], [4,3], [5,6], [6,5], [7,4]])
+    LIST_T = []
+    for i in range(10,50):
+        for j in range(8):
+            LIST_T = LIST_T + [[i, j]]
+    quant_test = np.array(LIST_T)
+    print(quant_test)
+
+    # [8, 7], [9, 3],
+    # [11, 0], [11, 1], [11, 2], [11, 3], [11, 5]
+    # [15, 2], [15, 5], [15, 6], [15, 7]
+    # [16, 7], [17, 1]
+    # [19,0], [19,1], [19,2], [19,3], [19,4]
+    # [20, 5], [20, 6], [21, 3], [21, 4], [21, 5] -- and all around here
+    # [22, 5], [22, 6], [22, 7],[23, 1], [23, 2], [23, 3], [23, 4], [23, 5]
 
     MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, quant_test)
 

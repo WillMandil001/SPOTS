@@ -17,12 +17,6 @@ from sklearn import preprocessing
 from datetime import datetime
 from scipy.spatial.transform import Rotation as R
 
-# SVG
-# SVTG_SE
-# SPOTS_SVG_ACTP
-
-
-
 dataset_path = "/home/user/Robotics/Data_sets/PRI/object1_motion1/"
 # Hyper-parameters:
 train_data_dir = dataset_path + 'Train/'
@@ -37,8 +31,8 @@ smooth = True
 image = False
 image_height = 64
 image_width = 64
-context_length = 10
-horrizon_length = 10
+context_length = 2
+horrizon_length = 5
 
 
 class data_formatter:
@@ -70,13 +64,14 @@ class data_formatter:
                 files_to_run = self.files_test_2
 
             for experiment_number, file in tqdm(enumerate(files_to_run)):
-                if stage != train_out_dir:
-                    path_save = stage + "test_trial_" + str(experiment_number) + '/'
-                    os.mkdir(path_save)
-                    self.path_file = []
-                    index_to_save = 0
-                else:
-                    path_save = stage
+                # if stage != train_out_dir:
+                #     path_save = stage + "test_trial_" + str(experiment_number) + '/'
+                #     os.mkdir(path_save)
+                #     self.path_file = []
+                #     index_to_save = 0
+                # else:
+                #     path_save = stage
+                path_save = stage
 
                 tactile, robot, image, depth = self.load_file_data(file)
 
@@ -118,9 +113,9 @@ class data_formatter:
                     self.path_file.append(ref)
                     index_to_save += 1
 
-                if stage != train_out_dir:
-                    self.test_no = experiment_number
-                    self.save_map(path_save, test=True)
+                # if stage != train_out_dir:
+                #     self.test_no = experiment_number
+                #     self.save_map(path_save, test=True)
 
             self.save_map(path_save)
 
