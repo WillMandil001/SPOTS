@@ -57,6 +57,7 @@ class Model:
         self.training_stages = features["training_stages"]
         self.training_stages_epochs = features["training_stages_epochs"]
         self.tactile_size = features["tactile_size"]
+        self.model_name_save_appendix = features["model_name_save_appendix"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
@@ -79,7 +80,6 @@ class Model:
         self.decoder_scene = full_model["decoder_scene"]
         self.MMFM_scene = full_model["MMFM_scene"]
         self.MMFM_tactile = full_model["MMFM_tactile"]
-
 
         self.frame_predictor_tactile.cuda()
         self.frame_predictor_scene.cuda()
@@ -345,5 +345,5 @@ class Model:
                     "frame_predictor_scene": self.frame_predictor_scene, "encoder_scene": self.encoder_scene,
                     "decoder_scene": self.decoder_scene,
                     "posterior": self.posterior, "prior": self.prior, 'features': self.features,
-                    "MMFM_scene": self.MMFM_scene, "MMFM_tactile": self.MMFM_tactile}, self.model_dir + save_name)
+                    "MMFM_scene": self.MMFM_scene, "MMFM_tactile": self.MMFM_tactile}, self.model_dir + save_name + self.model_name_save_appendix)
 

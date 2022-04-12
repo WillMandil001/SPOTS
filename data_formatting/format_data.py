@@ -22,16 +22,16 @@ dataset_path = "/home/user/Robotics/Data_sets/PRI/object1_motion1/"
 train_data_dir = dataset_path + 'Train/'
 test_data_dir  = dataset_path + 'Test_no_new/'
 test_data_dir_2= dataset_path + 'Test_novel/'
-train_out_dir  = dataset_path + 'train_formatted/'
-test_out_dir   = dataset_path + 'test_no_new_formatted/'
-test_out_dir_2 = dataset_path + 'test_novel_formatted/'
-scaler_out_dir = dataset_path + 'scalars/'
+train_out_dir  = dataset_path + 'train_formatted_1c/'
+test_out_dir   = dataset_path + 'test_no_new_formatted_1c/'
+test_out_dir_2 = dataset_path + 'test_novel_formatted_1c/'
+scaler_out_dir = dataset_path + 'scalars_1c/'
 
 smooth = True
 image = False
 image_height = 64
 image_width = 64
-context_length = 2
+context_length = 1
 horrizon_length = 5
 
 

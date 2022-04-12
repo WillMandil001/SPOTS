@@ -130,6 +130,7 @@ class UniversalModelTrainer:
         self.device = features["device"]
         self.num_workers = features["num_workers"]
         self.model_save_path = features["model_save_path"]
+        self.model_name_save_appendix = features["model_name_save_appendix"]
         self.stage = self.training_stages[0]
 
         self.gain = 0.0
@@ -173,9 +174,9 @@ class UniversalModelTrainer:
             for index, batch_features in enumerate(self.train_full_loader):
 
                 if self.stage == "scene_loss_plus_tactile_gradual_increase":
-                    gain += 0.00001
-                    if gain > 0.01:
-                        gain = 0.01
+                    self.gain += 0.00001
+                    if self.gain > 0.01:
+                        self.gain = 0.01
 
                 if batch_features[1].shape[0] == self.batch_size:
                     mae, kld, mae_tactile, predictions = self.format_and_run_batch(batch_features, test=False)
@@ -219,9 +220,11 @@ class UniversalModelTrainer:
             if previous_val_mean_loss < val_mae_losses / index__:
                 early_stop_clock += 1
                 previous_val_mean_loss = val_mae_losses / index__
-                if early_stop_clock == 4:
+                if early_stop_clock == 4 and self.training_stages[0] == "":
                     print("Early stopping")
                     break
+                if early_stop_clock == 4 and self.training_stages[0] != "": # skip to the next training phase:
+                    epoch = self.training_stages_epochs[self.training_stages.index(self.stage)]
             else:
                 if best_val_loss > val_mae_losses / index__:
                     print("saving model")
@@ -252,7 +255,7 @@ class UniversalModelTrainer:
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
-            mae, kld, mae_tactile, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
+            mae, kld, mae_tactile, predictions, tactile = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
 
         return mae, kld, mae_tactile, predictions
 
@@ -293,13 +296,14 @@ class UniversalModelTrainer:
 @click.option('--training_stages_epochs', type=click.Path(), default = "50,75,125", help = "define the end point of each training stage")
 @click.option('--num_workers', type=click.INT, default = 12, help = "number of workers used by the data loader")
 @click.option('--model_save_path', type=click.Path(), default = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/", help = "")
-@click.option('--train_data_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted/", help = "")
-@click.option('--scaler_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/", help = "")
+@click.option('--train_data_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted_1c/", help = "")
+@click.option('--scaler_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars_1c/", help = "")
+@click.option('--model_name_save_appendix', type=click.Path(), default = "_1c", help = "What to add to the save file to identify the model as a specific subset")
 def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, image_width, dataset,
          n_past, n_future, n_eval, prior_rnn_layers, posterior_rnn_layers, predictor_rnn_layers, state_action_size,
          z_dim, beta, data_threads, num_digits, last_frame_skip, epochs, train_percentage, validation_percentage,
          criterion, tactile_size, g_dim, rnn_size, channels, out_channels, training_stages, training_stages_epochs,
-         num_workers, model_save_path, train_data_dir, scaler_dir):
+         num_workers, model_save_path, train_data_dir, scaler_dir, model_name_save_appendix):
 
     # unique save title:
     model_save_path = model_save_path + model_name
@@ -339,6 +343,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
         training_stages_epochs = [50, 75, 125]
         tactile_size = 48
+        epochs = training_stages_epochs[-1]
 
     torch.manual_seed(seed)
     torch.backends.cudnn.benchmark = False
@@ -350,7 +355,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
                 "posterior_rnn_layers": posterior_rnn_layers, "predictor_rnn_layers": predictor_rnn_layers, "state_action_size": state_action_size, "z_dim": z_dim, "g_dim": g_dim, "beta": beta, "data_threads": data_threads, "num_digits": num_digits,
                 "last_frame_skip": last_frame_skip, "epochs": epochs, "train_percentage": train_percentage, "validation_percentage": validation_percentage, "criterion": criterion, "model_name": model_name,
                 "train_data_dir": train_data_dir, "scaler_dir": scaler_dir, "device": device, "training_stages":training_stages, "training_stages_epochs": training_stages_epochs, "tactile_size":tactile_size, "num_workers":num_workers,
-                "model_save_path":model_save_path}
+                "model_save_path":model_save_path, "model_name_save_appendix":model_name_save_appendix}
 
     # save features
     w = csv.writer(open(model_save_path + "/features.csv", "w"))

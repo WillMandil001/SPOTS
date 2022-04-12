@@ -88,6 +88,7 @@ class Model:
         self.criterion = features["criterion"]
         self.model_name = features["model_name"]
         self.device = features["device"]
+        self.model_name_save_appendix = features["model_name_save_appendix"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
@@ -143,7 +144,7 @@ class Model:
     def save_model(self):
         torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
                     'posterior': self.posterior, 'prior': self.prior, 'features': self.features},
-                    self.model_dir + "SVG_TE_model")
+                    self.model_dir + "SVG_TE_model" + self.model_name_save_appendix)
 
     def set_train(self):
         self.frame_predictor.train()
