@@ -123,3 +123,18 @@ class MMFM_tactile(nn.Module):
         h1 = self.mmfm_l1(input)
         h2 = self.mmfm_l2(h1)
         return h2
+
+
+class raw_tactile_encoder(nn.Module):
+    def __init__(self, input_dim, hidden_dim, out_dim):
+        super(raw_tactile_encoder, self).__init__()
+        self.tan_activation = nn.Tanh()
+        self.fc_layer1 = nn.Linear(input_dim, hidden_dim)
+        self.fc_layer2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_layer3 = nn.Linear(hidden_dim, out_dim)
+
+    def forward(self, tactile):
+        out1 = self.tan_activation(self.fc_layer1(tactile))
+        out2 = self.tan_activation(self.fc_layer2(out1))
+        out3 = self.tan_activation(self.fc_layer3(out2))
+        return out3

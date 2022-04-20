@@ -39,8 +39,13 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 from universal_networks.SVG import Model as SVG
-from universal_networks.SVG_tactile_enhanced import Model as SVG_TE
+from universal_networks.SVTG_SE import Model as SVTG_SE
 from universal_networks.SPOTS_SVG_ACTP import Model as SPOTS_SVG_ACTP
+from universal_networks.SVG_TC import Model as SVG_TC
+from universal_networks.SVG_TC_TE import Model as SVG_TC_TE
+from universal_networks.VG import Model as VG
+from universal_networks.SPOTS_VG_ACTP import Model as SPOTS_VG_ACTP
+from universal_networks.VG_MMMM import Model as VG_MMMM
 
 
 class PSNR:
@@ -262,13 +267,23 @@ class UniversalTester():
         self.model_name_save_appendix = features["model_name_save_appendix"]
 
         # load model
-        print(features["model_name"])
+        print(self.model_name)
         if self.model_name == "SVG":
             self.model = SVG(features)
-        if self.model_name == "SVG_TE":
-            self.model = SVG_TE(features)
-        if self.model_name == "SPOTS_SVG_ACTP":
+        elif self.model_name == "SVTG_SE":
+            self.model = SVTG_SE(features)
+        elif self.model_name == "SPOTS_SVG_ACTP":
             self.model = SPOTS_SVG_ACTP(features)
+        elif self.model_name == "SVG_TC":
+            self.model = SVG_TC(features)
+        elif self.model_name == "SVG_TC_TE":
+            self.model = SVG_TC_TE(features)
+        elif self.model_name == "VG":
+            self.model = VG(features)
+        elif self.model_name == "SPOTS_VG_ACTP":  # CHANGE BACK TO JUST VG!!!!
+            self.model = SPOTS_VG_ACTP(features)
+        elif self.model_name == "VG_MMMM":  # CHANGE BACK TO JUST VG!!!!
+            self.model = VG_MMMM(features)
 
         self.model.load_model(full_model = saved_model)
         # [saved_model[name].to("cpu") for name in saved_model if name != "features"]
@@ -375,7 +390,14 @@ class UniversalTester():
             if not qualitative:
                 scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
 
-        elif self.model_name == "SVG_TE":
+        elif self.model_name == "VG" or self.model_name == "VG_MMMM":
+            images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            mae, predictions = self.model.run(scene=images, actions=action, test=test)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
+
+        elif self.model_name == "SVTG_SE":
             images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(self.device)
             scene_and_touch = torch.cat((tactile, images), 2)
@@ -393,6 +415,23 @@ class UniversalTester():
             mae, kld, mae_tactile, predictions, tactile_predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
             if not qualitative:
                 scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
+
+        elif self.model_name == "SPOTS_VG_ACTP" or self.model_name == "SPOTS_VG_ACTP_BEST" or self.model_name == "SPOTS_VG_ACTP_stage1" or self.model_name == "SPOTS_VG_ACTP_stage2" or self.model_name == "SPOTS_VG_ACTP_stage3":
+            action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            images = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
+            mae, mae_tactile, predictions, tactile_predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
+
+        elif self.model_name == "SVG_TC" or self.model_name == "SVG_TC_TE":
+            images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
+            action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            mae, kld, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
+
 
         if qualitative:
             return predictions, tactile_predictions, images, tactile
@@ -431,16 +470,16 @@ class UniversalTester():
         return scene_losses, tactile_losses
 
 @click.command()
-@click.option('--model_name', type=click.Path(), default="SVG", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
-@click.option('--model_stage', type=click.Path(), default="", help='Set name for prediction model, SVG, SVG_TE, SPOTS_SVG_ACTP')
+@click.option('--model_name', type=click.Path(), default="SVG", help='Set name for prediction model, SVG, SVTG_SE, SVG_TC, SVG_TC_TE, SPOTS_SVG_ACTP')
+@click.option('--model_stage', type=click.Path(), default="", help='what stage of model should you test? BEST, stage1 etc.')
 @click.option('--model_folder_name', type=click.Path(), default="model_07_04_2022_17_04", help='Folder name where the model is stored')
 @click.option('--test_folder_name', type=click.Path(), default="test_novel_formatted", help='Folder name where the test data is stored, test_no_new_formatted, test_novel_formatted')
 @click.option('--quant_analysis', type=click.BOOL, default=True, help='Perform quantitative analysis on the test data')
 @click.option('--qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
 @click.option('--test_sample_time_step', type=click.Path(), default="[1, 5, 10]", help='which time steps in prediciton sequence to calculate performance metrics for.')
-@click.option('--model_name_save_appendix', type=click.Path(), default = "_1c", help = "What to add to the save file to identify the model as a specific subset")
+@click.option('--model_name_save_appendix', type=click.Path(), default = "_1c", help = "What to add to the save file to identify the model as a specific subset, _1c")
 def main(model_name, model_stage, model_folder_name, test_folder_name, quant_analysis, qual_analysis, test_sample_time_step, model_name_save_appendix):
-    # model names: SVG, SVG_TE, SPOTS_SVG_ACTP
+    # model names: SVG, SVTG_SE, SPOTS_SVG_ACTP
     model_save_path = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/" + model_name + "/" + model_folder_name + "/"
     test_data_dir  = "/home/user/Robotics/Data_sets/PRI/object1_motion1/" + test_folder_name + "/"
     scaler_dir      = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/"
@@ -451,11 +490,13 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, quant_ana
     except FileExistsError or FileNotFoundError:
         pass
 
-    if model_name == "SPOTS_SVG_ACTP":
+    if model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" :
         model_save_name = model_name + "_" + model_stage
     else:
         model_save_name = model_name + "_model"
 
+    print(model_save_name)
+    print(test_folder_name)
     # [batch, trial]
     # LIST_T = []
     # for i in range(50,100):

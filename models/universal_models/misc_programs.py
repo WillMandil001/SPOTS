@@ -5,12 +5,25 @@ from matplotlib import pyplot as plt
 
 
 def plot_model_performance():
-    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TE_vs_SPOTS_SVG_ACTP_no_new/"
+    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TC_vs_SVG_TC_TE_novel/"
     # save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TE_vs_SPOTS_SVG_ACTP_novel/"
-    model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_07_04_2022_17_04/qualitative_analysis/test_no_new_formatted/",
-                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_07_04_2022_19_33/qualitative_analysis/test_no_new_formatted/",
-                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP/model_08_04_2022_14_55/qualitative_analysis/BEST/test_no_new_formatted/"]
-    model_names = ["SVG", "SVG_TE", "SPOTS_SVG_ACTP_BEST"]
+    # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_07_04_2022_17_04/qualitative_analysis/test_no_new_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_07_04_2022_19_33/qualitative_analysis/test_no_new_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP/model_08_04_2022_14_55/qualitative_analysis/BEST/test_no_new_formatted/"]
+
+    # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_11_04_2022_16_44/qualitative_analysis/test_novel_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_11_04_2022_18_53/qualitative_analysis/test_novel_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP/model_11_04_2022_22_09/qualitative_analysis/BEST/test_novel_formatted/"]
+
+    model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_19_04_2022_10_25/qualitative_analysis/test_novel_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC/model_19_04_2022_11_22/qualitative_analysis/test_novel_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC_TE/model_19_04_2022_13_02/qualitative_analysis/test_novel_formatted/"]
+
+    # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/VG/model_18_04_2022_10_50/qualitative_analysis/test_no_new_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/VG_MMMM/model_18_04_2022_12_09/qualitative_analysis/test_no_new_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_VG_ACTP/model_18_04_2022_14_36/qualitative_analysis/BEST/test_no_new_formatted/"]
+
+    model_names = ["SVG", "SVG_TC", "SVG_TC_TE"]
     sequence_len = 5
 
     test_sequence_paths = list(glob(model_locations[0] + "*/", recursive = True))
@@ -43,5 +56,31 @@ def plot_model_performance():
 
     # for location in model_locations
 
+def plot_training_scores():
+    svg = np.load("saved_models/SVG/model_19_04_2022_10_25/plot_validation_loss.npy")
+    svg_tc = np.load("saved_models/SVG_TC/model_19_04_2022_11_22/plot_validation_loss.npy")
+    svg_tc_te = np.load("saved_models/SVG_TC_TE/model_19_04_2022_13_02/plot_validation_loss.npy")
+
+    svg = smooth_func(svg, 8)[4:-4]
+    svg_tc = smooth_func(svg_tc, 8)[4:-4]
+    svg_tc_te = smooth_func(svg_tc_te, 8)[4:-4]
+
+    plt.plot(svg, label="SVG")
+    plt.plot(svg_tc, label="SVG_TC")
+    plt.plot(svg_tc_te, label="SVG_TC_TE")
+    plt.legend()
+
+    plt.title("Validation training MAE", loc='center')
+    plt.xlabel("Epoch")
+    plt.ylabel("Val MAE")
+
+    plt.show()
+
+def smooth_func(y, box_pts):
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
+
 if __name__ == '__main__':
-    plot_model_performance()
+    plot_training_scores()
+    # plot_model_performance()
