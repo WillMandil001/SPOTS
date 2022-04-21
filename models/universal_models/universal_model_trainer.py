@@ -6,13 +6,11 @@ import csv
 import cv2
 import numpy as np
 import click
+import random
 
 from tqdm import tqdm
 from datetime import datetime
 from torch.utils.data import Dataset
-
-import matplotlib.pyplot as plt
-import random
 
 import torch
 import torch.nn as nn
@@ -91,12 +89,11 @@ class FullDataSet:
         occ_images = []
         for image_name in np.load(self.train_data_dir + value[2]):
             images.append(np.load(self.train_data_dir + image_name))
-            if self.occlusion_test:
-                occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name)))
+            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name)))
 
         experiment_number = np.load(self.train_data_dir + value[3])
         time_steps = np.load(self.train_data_dir + value[4])
-        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(images).astype(np.float32)]
+        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
     def add_occlusion(self, image):
         # random start point:
@@ -218,6 +215,7 @@ class UniversalModelTrainer:
         best_val_loss = 100.0
         early_stop_clock = 0
         if self.occlusion_test:
+            self.start_saving_now = True
             occlusion_gain = 0.0
         progress_bar = tqdm(range(0, self.epochs), total=(self.epochs*len(self.train_full_loader)))
         for epoch in progress_bar:
@@ -234,6 +232,10 @@ class UniversalModelTrainer:
                 if epoch >= self.occlusion_start_epoch:
                     occlusion_gain += self.occlusion_gain_per_epoch
                     if self.occlusion_max_size < occlusion_gain:
+                        if self.start_saving_now:  # reset the validation scores, so that the models will be saved wrt the occlusion at its highest setting.
+                            previous_val_mean_loss = 100.0
+                            best_val_loss = 100.0
+                        self.start_saving_now = False
                         occlusion_gain = self.occlusion_max_size
                     box_size = self.image_width * occlusion_gain
                     BG = BatchGenerator(self.train_percentage, self.train_data_dir, self.batch_size, self.image_width, self.num_workers, self.occlusion_test, box_size)
@@ -372,7 +374,6 @@ class UniversalModelTrainer:
             action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, kld, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
 
-
         return mae, kld, mae_tactile, predictions
 
 
@@ -469,7 +470,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         training_stages_epochs = [35, 55, 100]
         # training_stages_epochs = [50, 75, 125]
         tactile_size = 48
-        epochs = training_stages_epochs[-1]
+        epochs = training_stages_epochs[-1] + 1
     elif model_name == "SVG_TC_TE":
         g_dim = 256
         rnn_size = 256
