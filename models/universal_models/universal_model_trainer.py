@@ -34,6 +34,9 @@ from universal_networks.VG_MMMM import Model as VG_MMMM
 from universal_networks.SVG_occ import Model as SVG_occ
 from universal_networks.SVTG_SE_occ import Model as SVTG_SE_occ
 from universal_networks.SPOTS_SVG_ACTP_occ import Model as SPOTS_SVG_ACTP_occ
+from universal_networks.SVG_TC_occ import Model as SVG_TC_occ
+from universal_networks.SVG_TC_TE_occ import Model as SVG_TC_TE_occ
+
 
 class BatchGenerator:
     def __init__(self, train_percentage, train_data_dir, batch_size, image_size, num_workers, occlusion_test=False, occlusion_size=0):
@@ -62,15 +65,12 @@ class BatchGenerator:
 
 
 class FullDataSet:
-    def __init__(self, data_map, train_data_dir, train=False, validation=False, train_percentage=1.0, image_size=64, occlusion_test=False, occlusion_size=0):
-        self.image_size = image_size
-        self.train_data_dir = train_data_dir
+    def __init__(self, data_map, test_data_dir, occlusion_size=0, image_size=64, occlusion_test=False):
         self.occlusion_test = occlusion_test
+        self.test_data_dir = test_data_dir
+        self.image_size = image_size
         self.occlusion_size = occlusion_size
-        if train:
-            self.samples = data_map[1:int((len(data_map) * train_percentage))]
-        if validation:
-            self.samples = data_map[int((len(data_map) * train_percentage)): -1]
+        self.samples = data_map[1:]
         data_map = None
 
     def __len__(self):
@@ -78,34 +78,42 @@ class FullDataSet:
 
     def __getitem__(self, idx):
         value = self.samples[idx]
-        robot_data = np.load(self.train_data_dir + value[0])
+        robot_data = np.load(self.test_data_dir + value[0])
 
-        tactile_data = np.load(self.train_data_dir + value[1])
+        tactile_data = np.load(self.test_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
             tactile_images.append(create_image(tactile_data_sample, image_size=self.image_size))
 
         images = []
         occ_images = []
-        for image_name in np.load(self.train_data_dir + value[2]):
-            images.append(np.load(self.train_data_dir + image_name))
-            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name)))
+        if self.occlusion_test:
+            # random start point:
+            min_pixel = int(((self.occlusion_size / 2) + 1))
+            max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+            rand_x = random.randint(min_pixel, max_pixel)
+            rand_y = random.randint(min_pixel, max_pixel)
+        for image_name in np.load(self.test_data_dir + value[2]):
+            images.append(np.load(self.test_data_dir + image_name))
+            if self.occlusion_test:
+                occ_images.append(self.add_occlusion(np.load(self.test_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
 
-        experiment_number = np.load(self.train_data_dir + value[3])
-        time_steps = np.load(self.train_data_dir + value[4])
+        experiment_number = np.load(self.test_data_dir + value[3])
+        time_steps = np.load(self.test_data_dir + value[4])
         return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
-    def add_occlusion(self, image):
-        # random start point:
-        rand_x = random.randint(0, self.image_size)
-        rand_y = random.randint(0, self.image_size)
-        for i in range(max(0, (rand_x - int(self.occlusion_size / 2))), (rand_x + int(self.occlusion_size / 2))):
-            for j in range(max(0, (rand_y - int(self.occlusion_size / 2))), (rand_y + int(self.occlusion_size / 2))):
-                try:
-                    image[i,j,:] = 0.0
-                except:
-                    pass  # out of bounds
+    def add_occlusion(self, image, min_pixel, max_pixel, rand_x, rand_y):
+        if min_pixel >= max_pixel:
+            image[:,:,:] = 0.0
+        else:
+            for i in range(rand_x - int(self.occlusion_size / 2), rand_x + int(self.occlusion_size / 2)):
+                for j in range(rand_y - int(self.occlusion_size / 2), rand_y + int(self.occlusion_size / 2)):
+                    try:
+                        image[i,j,:] = 0.0
+                    except:
+                        pass  # out of bounds
         return image
+
 
 def create_image(tactile, image_size):
     # convert tactile data into an image:
@@ -197,6 +205,10 @@ class UniversalModelTrainer:
             self.model = SPOTS_VG_ACTP(features)
         elif self.model_name == "SPOTS_SVG_ACTP_occ":
             self.model = SPOTS_SVG_ACTP_occ(features)
+        elif self.model_name == "SVG_TC_occ":
+            self.model = SVG_TC_occ(features)
+        elif self.model_name == "SVG_TC_TE_occ":
+            self.model = SVG_TC_TE_occ(features)
 
         self.model.initialise_model()
 
@@ -211,6 +223,7 @@ class UniversalModelTrainer:
     def train_full_model(self):
         plot_training_loss = []
         plot_validation_loss = []
+        plot_training_save_points = []
         previous_val_mean_loss = 100.0
         best_val_loss = 100.0
         early_stop_clock = 0
@@ -306,6 +319,7 @@ class UniversalModelTrainer:
             else:
                 if best_val_loss > val_mae_losses / index__:
                     print("saving model")
+                    plot_training_save_points.append(epoch+1)
                     # save the model
                     if self.stage != "":
                         self.model.save_model("best")
@@ -314,6 +328,13 @@ class UniversalModelTrainer:
                     best_val_loss = val_mae_losses / index__
                 early_stop_clock = 0
                 previous_val_mean_loss = val_mae_losses / index__
+
+            np.save(self.model_save_path + "plot_training_loss", np.array(plot_training_save_points))
+            lines = list(plot_training_save_points)
+            with open (self.model_save_path + "plot_training_loss.txt", 'w') as f:
+                for line in lines:
+                    f.write("saved after epoch: " + str(line))
+                    f.write('\n')
 
     def format_and_run_batch(self, batch_features, test):
         mae, kld, mae_tactile, predictions = None, None, None, None
@@ -374,6 +395,13 @@ class UniversalModelTrainer:
             action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, kld, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
 
+        elif self.model_name == "SVG_TC_occ" or self.model_name == "SVG_TC_TE_occ":
+            images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            images_occ = batch_features[6].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
+            action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            mae, kld, predictions = self.model.run(scene=images_occ, tactile=tactile, actions=action, scene_gt=images, gain=self.gain, test=test, stage=self.stage)
+
         return mae, kld, mae_tactile, predictions
 
 
@@ -420,7 +448,7 @@ class UniversalModelTrainer:
 @click.option('--tactile_encoder_output_size', type=click.INT, default = 0, help = "size of output layer from tactile encoder, 100")
 @click.option('--occlusion_test', type=click.BOOL, default = False, help = "if you would like to train for occlusion")
 @click.option('--occlusion_gain_per_epoch', type=click.FLOAT, default = 0.05, help = "increasing size of the occlusion block per epoch 0.1=(0.1 x MAX) each epoch")
-@click.option('--occlusion_start_epoch', type=click.INT, default = 15, help = "size of output layer from tactile encoder, 100")
+@click.option('--occlusion_start_epoch', type=click.INT, default = 20, help = "size of output layer from tactile encoder, 100")
 @click.option('--occlusion_max_size', type=click.FLOAT, default = 1.0, help = "max size of the window as a % of total size (0.5 = 50% of frame (32x32 squares in ))")
 def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, image_width, dataset,
          n_past, n_future, n_eval, prior_rnn_layers, posterior_rnn_layers, predictor_rnn_layers, state_action_size,
@@ -446,7 +474,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
     model_dir = model_save_path
     data_root = train_data_dir
 
-    if model_name == "SVG" or model_name == "SVG_TC" or model_name == "VG" or model_name == "VG_MMMM" or model_name == "SVG_occ":
+    if model_name == "SVG" or model_name == "SVG_TC" or model_name == "VG" or model_name == "VG_MMMM" or model_name == "SVG_occ" or model_name == "SVG_TC_occ":
         g_dim = 256  # 128
         rnn_size = 256
         channels = 3
@@ -467,11 +495,11 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         channels = 3
         out_channels = 3
         training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
-        training_stages_epochs = [35, 55, 100]
+        training_stages_epochs = [35, 65, 150]
         # training_stages_epochs = [50, 75, 125]
         tactile_size = 48
         epochs = training_stages_epochs[-1] + 1
-    elif model_name == "SVG_TC_TE":
+    elif model_name == "SVG_TC_TE" or model_name == "SVG_TC_TE_occ":
         g_dim = 256
         rnn_size = 256
         channels = 3
@@ -481,7 +509,6 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         tactile_size = 48
         tactile_encoder_hidden_size = 200
         tactile_encoder_output_size = 100
-
 
     torch.manual_seed(seed)
     torch.backends.cudnn.benchmark = False

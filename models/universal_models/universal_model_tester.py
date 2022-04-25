@@ -58,6 +58,9 @@ from universal_networks.VG_MMMM import Model as VG_MMMM
 from universal_networks.SVG_occ import Model as SVG_occ
 from universal_networks.SVTG_SE_occ import Model as SVTG_SE_occ
 from universal_networks.SPOTS_SVG_ACTP_occ import Model as SPOTS_SVG_ACTP_occ
+from universal_networks.SVG_TC_occ import Model as SVG_TC_occ
+from universal_networks.SVG_TC_TE_occ import Model as SVG_TC_TE_occ
+
 
 class PSNR:
     """Peak Signal to Noise Ratio
@@ -171,12 +174,15 @@ class BatchGenerator:
 
 
 class FullDataSet:
-    def __init__(self, data_map, test_data_dir, occlusion_size=0, image_size=64, occlusion_test=False):
-        self.occlusion_test = occlusion_test
-        self.test_data_dir = test_data_dir
+    def __init__(self, data_map, train_data_dir, train=False, validation=False, train_percentage=1.0, image_size=64, occlusion_test=False, occlusion_size=0):
         self.image_size = image_size
+        self.train_data_dir = train_data_dir
+        self.occlusion_test = occlusion_test
         self.occlusion_size = occlusion_size
-        self.samples = data_map[1:]
+        if train:
+            self.samples = data_map[1:int((len(data_map) * train_percentage))]
+        if validation:
+            self.samples = data_map[int((len(data_map) * train_percentage)): -1]
         data_map = None
 
     def __len__(self):
@@ -184,35 +190,41 @@ class FullDataSet:
 
     def __getitem__(self, idx):
         value = self.samples[idx]
-        robot_data = np.load(self.test_data_dir + value[0])
+        robot_data = np.load(self.train_data_dir + value[0])
 
-        tactile_data = np.load(self.test_data_dir + value[1])
+        tactile_data = np.load(self.train_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
             tactile_images.append(create_image(tactile_data_sample, image_size=self.image_size))
 
         images = []
         occ_images = []
-        for image_name in np.load(self.test_data_dir + value[2]):
-            images.append(np.load(self.test_data_dir + image_name))
-            if self.occlusion_test:
-                occ_images.append(self.add_occlusion(np.load(self.test_data_dir + image_name)))
+        for image_name in np.load(self.train_data_dir + value[2]):
+            images.append(np.load(self.train_data_dir + image_name))
+            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name)))
 
-        experiment_number = np.load(self.test_data_dir + value[3])
-        time_steps = np.load(self.test_data_dir + value[4])
-        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(images).astype(np.float32)]
+        experiment_number = np.load(self.train_data_dir + value[3])
+        time_steps = np.load(self.train_data_dir + value[4])
+        return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
     def add_occlusion(self, image):
         # random start point:
-        rand_x = random.randint(0, self.image_size)
-        rand_y = random.randint(0, self.image_size)
-        for i in range(max(0, (rand_x - int(self.occlusion_size / 2))), (rand_x + int(self.occlusion_size / 2))):
-            for j in range(max(0, (rand_y - int(self.occlusion_size / 2))), (rand_y + int(self.occlusion_size / 2))):
-                try:
-                    image[i,j,:] = 0.0
-                except:
-                    pass  # out of bounds
+        min_pixel = int(((self.occlusion_size / 2) + 1))
+        max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+
+        if min_pixel >= max_pixel:
+            image[:,:,:] = 0.0
+        else:
+            rand_x = random.randint(min_pixel, max_pixel)
+            rand_y = random.randint(min_pixel, max_pixel)
+            for i in range(rand_x - int(self.occlusion_size / 2), rand_x + int(self.occlusion_size / 2)):
+                for j in range(rand_y - int(self.occlusion_size / 2), rand_y + int(self.occlusion_size / 2)):
+                    try:
+                        image[i,j,:] = 0.0
+                    except:
+                        pass  # out of bounds
         return image
+
 
 def create_image(tactile, image_size):
     # convert tactile data into an image:
@@ -300,7 +312,7 @@ class UniversalTester():
             self.occlusion_max_size = features["occlusion_max_size"]
             self.occlusion_start_epoch = features["occlusion_start_epoch"]
             self.occlusion_gain_per_epoch = features["occlusion_gain_per_epoch"]
-            self.occlusion_size = int(self.occlusion_start_epoch * self.image_width)
+            self.occlusion_size = int(self.occlusion_max_size * self.image_width)
         except:
             self.occlusion_test = False
             self.occlusion_max_size = 0
@@ -331,12 +343,17 @@ class UniversalTester():
             self.model = SPOTS_VG_ACTP(features)
         elif self.model_name == "SPOTS_SVG_ACTP_occ":
             self.model = SPOTS_SVG_ACTP_occ(features)
+        elif self.model_name == "SVG_TC_occ":
+            self.model = SVG_TC_occ(features)
+        elif self.model_name == "SVG_TC_TE_occ":
+            self.model = SVG_TC_TE_occ(features)
 
         self.model.load_model(full_model = saved_model)
         # [saved_model[name].to("cpu") for name in saved_model if name != "features"]
         saved_model = []
 
         # load test set:
+        print(self.occlusion_test, self.occlusion_size)
         BG = BatchGenerator(self.test_data_dir, self.batch_size, self.image_width, self.occlusion_test, self.occlusion_size)
         self.test_full_loader = BG.load_data()
 
@@ -402,16 +419,10 @@ class UniversalTester():
         except FileExistsError or FileNotFoundError:
             pass
 
-        print("HERERERERERE")
-
         with torch.no_grad():
             for index, batch_features in enumerate(self.test_full_loader):
-                print ("HERERERERERE")
                 if batch_features[1].shape[0] == self.batch_size:
-                    print ("111HERERERERERE")
                     predictions, tactile_predictions, images, tactile, images_occ = self.format_and_run_batch(batch_features, test=True, qualitative=True)
-                    print ("222HERERERERERE")
-
                     if index in self.quant_test[:,0]:
                         list_of_sub_batch_trials_to_test = [i[1] for i in self.quant_test if i[0] == index]
                         for test_trial in list_of_sub_batch_trials_to_test:
@@ -420,7 +431,6 @@ class UniversalTester():
                                 os.mkdir(sequence_save_path)
                             except FileExistsError or FileNotFoundError:
                                 pass
-                            print ("333HERERERERERE")
 
                             for i in range(self.n_future):
                                 plt.figure(1)
@@ -499,7 +509,7 @@ class UniversalTester():
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             images_occ  = batch_features[6].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
-            mae, kld, mae_tactile, predictions, tactile = self.model.run(scene=images_occ, tactile=tactile, actions=action, scene_gt=images, gain=self.gain, test=test, stage=self.stage)
+            mae, kld, mae_tactile, predictions, tactile_predictions = self.model.run(scene=images_occ, tactile=tactile, actions=action, scene_gt=images, gain=self.gain, test=test, stage=self.stage)
             if not qualitative:
                 scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions, tactile[self.n_past:], tactile_predictions)
 
@@ -520,7 +530,19 @@ class UniversalTester():
                 scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
 
         if qualitative:
-            return predictions, tactile_predictions, images, tactile
+            return predictions, tactile_predictions, images, tactile, images_occ
+
+        elif self.model_name == "SVG_TC_occ" or self.model_name == "SVG_TC_TE_occ":
+            images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
+            action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            images_occ  = batch_features[6].permute(1, 0, 4, 3, 2).to(self.device)
+            mae, kld, predictions = self.model.run(scene=images_occ, tactile=tactile, actions=action, scene_gt=images, gain=self.gain, test=test, stage=self.stage)
+            if not qualitative:
+                scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
+
+        if qualitative:
+            return predictions, tactile_predictions, images, tactile, images_occ
 
         return scene_MAE, tactile_MAE, predictions, tactile_predictions, images_occ
 
@@ -558,11 +580,11 @@ class UniversalTester():
 @click.command()
 @click.option('--model_name', type=click.Path(), default="SVG_occ", help='Set name for prediction model, SVG, SVTG_SE, SVG_TC, SVG_TC_TE, SPOTS_SVG_ACTP')
 @click.option('--model_stage', type=click.Path(), default="", help='what stage of model should you test? BEST, stage1 etc.')
-@click.option('--model_folder_name', type=click.Path(), default="model_20_04_2022_15_18", help='Folder name where the model is stored')
+@click.option('--model_folder_name', type=click.Path(), default="model_21_04_2022_09_48", help='Folder name where the model is stored')
 @click.option('--test_folder_name', type=click.Path(), default="test_no_new_formatted", help='Folder name where the test data is stored, test_no_new_formatted, test_novel_formatted')
-@click.option('--quant_analysis', type=click.BOOL, default=False, help='Perform quantitative analysis on the test data')
+@click.option('--quant_analysis', type=click.BOOL, default=True, help='Perform quantitative analysis on the test data')
 @click.option('--qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
-@click.option('--test_sample_time_step', type=click.Path(), default="[1, 5, 10]", help='which time steps in prediciton sequence to calculate performance metrics for.')
+@click.option('--test_sample_time_step', type=click.Path(), default="[1, 2, 10]", help='which time steps in prediciton sequence to calculate performance metrics for.')
 @click.option('--model_name_save_appendix', type=click.Path(), default = "", help = "What to add to the save file to identify the model as a specific subset, _1c")
 def main(model_name, model_stage, model_folder_name, test_folder_name, quant_analysis, qual_analysis, test_sample_time_step, model_name_save_appendix):
     # model names: SVG, SVTG_SE, SPOTS_SVG_ACTP
@@ -576,7 +598,7 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, quant_ana
     except FileExistsError or FileNotFoundError:
         pass
 
-    if model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" :
+    if model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" or model_name == "SPOTS_SVG_ACTP_occ":
         model_save_name = model_name + "_" + model_stage
     else:
         model_save_name = model_name + "_model"

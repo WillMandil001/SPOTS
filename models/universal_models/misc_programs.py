@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 
 def plot_model_performance():
-    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TC_vs_SVG_TC_TE_novel/"
+    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/OCC_SVG_vs_SVG_TC_vs_SVG_TC_TE_no_new/"
     # save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TE_vs_SPOTS_SVG_ACTP_novel/"
     # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_07_04_2022_17_04/qualitative_analysis/test_no_new_formatted/",
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_07_04_2022_19_33/qualitative_analysis/test_no_new_formatted/",
@@ -15,15 +15,20 @@ def plot_model_performance():
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_11_04_2022_18_53/qualitative_analysis/test_novel_formatted/",
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP/model_11_04_2022_22_09/qualitative_analysis/BEST/test_novel_formatted/"]
 
-    model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_19_04_2022_10_25/qualitative_analysis/test_novel_formatted/",
-                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC/model_19_04_2022_11_22/qualitative_analysis/test_novel_formatted/",
-                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC_TE/model_19_04_2022_13_02/qualitative_analysis/test_novel_formatted/"]
+    # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_19_04_2022_10_25/qualitative_analysis/test_novel_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC/model_19_04_2022_11_22/qualitative_analysis/test_novel_formatted/",
+    #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC_TE/model_19_04_2022_13_02/qualitative_analysis/test_novel_formatted/"]
 
     # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/VG/model_18_04_2022_10_50/qualitative_analysis/test_no_new_formatted/",
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/VG_MMMM/model_18_04_2022_12_09/qualitative_analysis/test_no_new_formatted/",
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_VG_ACTP/model_18_04_2022_14_36/qualitative_analysis/BEST/test_no_new_formatted/"]
 
-    model_names = ["SVG", "SVG_TC", "SVG_TC_TE"]
+
+    model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_occ/model_22_04_2022_10_52/qualitative_analysis/test_no_new_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVTG_SE_occ/model_22_04_2022_13_07/qualitative_analysis/test_no_new_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP_occ/model_22_04_2022_16_02/qualitative_analysis/BEST/test_no_new_formatted/"]
+
+    model_names = ["SVG_occ", "SVTG_SE_occ", "SPOTS_SVG_ACTP_occ"]
     sequence_len = 5
 
     test_sequence_paths = list(glob(model_locations[0] + "*/", recursive = True))
@@ -82,5 +87,5 @@ def smooth_func(y, box_pts):
     return y_smooth
 
 if __name__ == '__main__':
-    plot_training_scores()
-    # plot_model_performance()
+    # plot_training_scores()
+    plot_model_performance()
