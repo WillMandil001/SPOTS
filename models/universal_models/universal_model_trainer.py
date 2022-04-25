@@ -65,12 +65,15 @@ class BatchGenerator:
 
 
 class FullDataSet:
-    def __init__(self, data_map, test_data_dir, occlusion_size=0, image_size=64, occlusion_test=False):
-        self.occlusion_test = occlusion_test
-        self.test_data_dir = test_data_dir
+    def __init__(self, data_map, train_data_dir, train=False, validation=False, train_percentage=1.0, image_size=64, occlusion_test=False, occlusion_size=0):
         self.image_size = image_size
+        self.train_data_dir = train_data_dir
+        self.occlusion_test = occlusion_test
         self.occlusion_size = occlusion_size
-        self.samples = data_map[1:]
+        if train:
+            self.samples = data_map[1:int((len(data_map) * train_percentage))]
+        if validation:
+            self.samples = data_map[int((len(data_map) * train_percentage)): -1]
         data_map = None
 
     def __len__(self):
@@ -78,28 +81,26 @@ class FullDataSet:
 
     def __getitem__(self, idx):
         value = self.samples[idx]
-        robot_data = np.load(self.test_data_dir + value[0])
+        robot_data = np.load(self.train_data_dir + value[0])
 
-        tactile_data = np.load(self.test_data_dir + value[1])
+        tactile_data = np.load(self.train_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
             tactile_images.append(create_image(tactile_data_sample, image_size=self.image_size))
 
         images = []
         occ_images = []
-        if self.occlusion_test:
-            # random start point:
-            min_pixel = int(((self.occlusion_size / 2) + 1))
-            max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
-            rand_x = random.randint(min_pixel, max_pixel)
-            rand_y = random.randint(min_pixel, max_pixel)
-        for image_name in np.load(self.test_data_dir + value[2]):
-            images.append(np.load(self.test_data_dir + image_name))
-            if self.occlusion_test:
-                occ_images.append(self.add_occlusion(np.load(self.test_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
+        # random start point:
+        min_pixel = int(((self.occlusion_size / 2) + 1))
+        max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+        rand_x = random.randint(min_pixel, max_pixel)
+        rand_y = random.randint(min_pixel, max_pixel)
+        for image_name in np.load(self.train_data_dir + value[2]):
+            images.append(np.load(self.train_data_dir + image_name))
+            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
 
-        experiment_number = np.load(self.test_data_dir + value[3])
-        time_steps = np.load(self.test_data_dir + value[4])
+        experiment_number = np.load(self.train_data_dir + value[3])
+        time_steps = np.load(self.train_data_dir + value[4])
         return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
     def add_occlusion(self, image, min_pixel, max_pixel, rand_x, rand_y):
