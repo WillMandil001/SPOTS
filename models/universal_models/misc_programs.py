@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 
 def plot_model_performance():
-    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/OCC_SVG_vs_SVG_TC_vs_SVG_TC_TE_no_new/"
+    save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/OCC_SVG_vs_SVTG_SE_vs_SPOTSACTP_vs_SVG_TC_vs_SVG_TC_TE_no_new/"
     # save_location = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/SVG_vs_SVG_TE_vs_SPOTS_SVG_ACTP_novel/"
     # model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG/model_07_04_2022_17_04/qualitative_analysis/test_no_new_formatted/",
     #                    "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TE/model_07_04_2022_19_33/qualitative_analysis/test_no_new_formatted/",
@@ -26,9 +26,11 @@ def plot_model_performance():
 
     model_locations = ["/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_occ/model_22_04_2022_10_52/qualitative_analysis/test_no_new_formatted/",
                        "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVTG_SE_occ/model_22_04_2022_13_07/qualitative_analysis/test_no_new_formatted/",
-                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP_occ/model_22_04_2022_16_02/qualitative_analysis/BEST/test_no_new_formatted/"]
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SPOTS_SVG_ACTP_occ/model_22_04_2022_16_02/qualitative_analysis/BEST/test_no_new_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC_occ/model_24_04_2022_16_39/qualitative_analysis/test_no_new_formatted/",
+                       "/home/user/Robotics/SPOTS/models/universal_models/saved_models/SVG_TC_TE_occ/model_24_04_2022_18_59/qualitative_analysis/test_no_new_formatted/"]
 
-    model_names = ["SVG_occ", "SVTG_SE_occ", "SPOTS_SVG_ACTP_occ"]
+    model_names = ["SVG_occ", "SVTG_SE_occ", "SPOTS_SVG_ACTP_occ", "SVG_TC_occ", "SVG_TC_TE_occ"]
     sequence_len = 5
 
     test_sequence_paths = list(glob(model_locations[0] + "*/", recursive = True))

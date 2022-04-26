@@ -93,8 +93,12 @@ class FullDataSet:
         # random start point:
         min_pixel = int(((self.occlusion_size / 2) + 1))
         max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
-        rand_x = random.randint(min_pixel, max_pixel)
-        rand_y = random.randint(min_pixel, max_pixel)
+        if min_pixel >= max_pixel:
+            rand_x = None
+            rand_y = None
+        else:
+            rand_x = random.randint(min_pixel, max_pixel)
+            rand_y = random.randint(min_pixel, max_pixel)
         for image_name in np.load(self.train_data_dir + value[2]):
             images.append(np.load(self.train_data_dir + image_name))
             occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))

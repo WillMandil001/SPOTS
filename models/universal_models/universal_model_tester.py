@@ -199,24 +199,26 @@ class FullDataSet:
 
         images = []
         occ_images = []
+        min_pixel = int(((self.occlusion_size / 2) + 1))
+        max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+        if min_pixel >= max_pixel:
+            rand_x = None
+            rand_y = None
+        else:
+            rand_x = random.randint(min_pixel, max_pixel)
+            rand_y = random.randint(min_pixel, max_pixel)
         for image_name in np.load(self.train_data_dir + value[2]):
             images.append(np.load(self.train_data_dir + image_name))
-            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name)))
+            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
 
         experiment_number = np.load(self.train_data_dir + value[3])
         time_steps = np.load(self.train_data_dir + value[4])
         return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
-    def add_occlusion(self, image):
-        # random start point:
-        min_pixel = int(((self.occlusion_size / 2) + 1))
-        max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
-
+    def add_occlusion(self, image, min_pixel, max_pixel, rand_x, rand_y):
         if min_pixel >= max_pixel:
             image[:,:,:] = 0.0
         else:
-            rand_x = random.randint(min_pixel, max_pixel)
-            rand_y = random.randint(min_pixel, max_pixel)
             for i in range(rand_x - int(self.occlusion_size / 2), rand_x + int(self.occlusion_size / 2)):
                 for j in range(rand_y - int(self.occlusion_size / 2), rand_y + int(self.occlusion_size / 2)):
                     try:
@@ -528,9 +530,6 @@ class UniversalTester():
             mae, kld, predictions = self.model.run(scene=images, tactile=tactile, actions=action, gain=self.gain, test=test, stage=self.stage)
             if not qualitative:
                 scene_MAE, tactile_MAE = self.calculate_losses(images[self.n_past:], predictions)
-
-        if qualitative:
-            return predictions, tactile_predictions, images, tactile, images_occ
 
         elif self.model_name == "SVG_TC_occ" or self.model_name == "SVG_TC_TE_occ":
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)

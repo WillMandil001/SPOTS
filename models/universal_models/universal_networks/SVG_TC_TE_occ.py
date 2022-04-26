@@ -122,7 +122,7 @@ class Model:
     def save_model(self):
         torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'tactile_encoder': self.tactile_encoder,
                     'frame_predictor': self.frame_predictor, 'posterior': self.posterior, 'prior': self.prior,
-                    'features': self.features}, self.model_dir + "SVG_TC_TE_model" + self.model_name_save_appendix)
+                    'features': self.features}, self.model_dir + "SVG_TC_TE_occ_model" + self.model_name_save_appendix)
 
     def set_train(self):
         self.frame_predictor.train()
