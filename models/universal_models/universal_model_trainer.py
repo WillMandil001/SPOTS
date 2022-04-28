@@ -20,6 +20,7 @@ import torchvision
 from universal_networks.SVG import Model as SVG
 from universal_networks.SVTG_SE import Model as SVTG_SE
 from universal_networks.SPOTS_SVG_ACTP import Model as SPOTS_SVG_ACTP
+from universal_networks.SPOTS_SVG_PTI_ACTP import Model as SPOTS_SVG_PTI_ACTP
 
 # tactile conditioned models:
 from universal_networks.SVG_TC import Model as SVG_TC
@@ -214,6 +215,8 @@ class UniversalModelTrainer:
             self.model = SVG_TC_occ(features)
         elif self.model_name == "SVG_TC_TE_occ":
             self.model = SVG_TC_TE_occ(features)
+        elif self.model_name == "SPOTS_SVG_PTI_ACTP":
+            self.model = SPOTS_SVG_PTI_ACTP(features)
 
         self.model.initialise_model()
 
@@ -375,7 +378,7 @@ class UniversalModelTrainer:
             scene_and_touch_gt = torch.cat((tactile, images), 2)
             mae, kld, predictions = self.model.run(scene_and_touch=scene_and_touch, scene_and_touch_gt=scene_and_touch_gt, actions=action, test=test)
 
-        elif self.model_name == "SPOTS_SVG_ACTP":
+        elif self.model_name == "SPOTS_SVG_ACTP" or self.model_name == "SPOTS_SVG_PTI_ACTP":
             action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
@@ -494,7 +497,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         training_stages = [""]
         training_stages_epochs = [epochs]
         tactile_size = [image_width, image_width]
-    elif model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" or model_name == "SPOTS_SVG_ACTP_occ":
+    elif model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" or model_name == "SPOTS_SVG_ACTP_occ" or model_name == "SPOTS_SVG_PTI_ACTP":
         g_dim = 256
         rnn_size = 256
         channels = 3
