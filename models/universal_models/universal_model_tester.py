@@ -243,7 +243,7 @@ def create_image(tactile, image_size):
 
 
 class UniversalTester():
-    def __init__(self, data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, quant_test, model_name_save_appendix):
+    def __init__(self, data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, tactile_qual_analysis, quant_test, model_name_save_appendix):
         self.scene_loss_titles = ["Scene MAE: ", "Scene MAE T1: ", "Scene MAE T5: ", "Scene MAE T10: ",
                                   "Scene MSE: ", "Scene MSE T1: ", "Scene MSE T5: ", "Scene MSE T10: ",
                                   "Scene PSNR: ", "Scene PSNR T1: ", "Scene PSNR T5: ", "Scene PSNR T10: ",
@@ -264,6 +264,7 @@ class UniversalTester():
         self.model_save_path = model_save_path
         self.test_folder_name = test_folder_name
         self.model_folder_name = model_folder_name
+        self.tactile_qual_analysis = tactile_qual_analysis
 
         saved_model = torch.load(model_save_path + model_save_name + model_name_save_appendix)
         features = saved_model["features"]
@@ -425,30 +426,43 @@ class UniversalTester():
             for index, batch_features in enumerate(self.test_full_loader):
                 if batch_features[1].shape[0] == self.batch_size:
                     predictions, tactile_predictions, images, tactile, images_occ = self.format_and_run_batch(batch_features, test=True, qualitative=True)
-                    if index in self.quant_test[:,0]:
-                        list_of_sub_batch_trials_to_test = [i[1] for i in self.quant_test if i[0] == index]
-                        for test_trial in list_of_sub_batch_trials_to_test:
-                            sequence_save_path = qual_save_path + "batch_" + str(index) + "sub_batch_" + str(test_trial) + "/"
-                            try:
-                                os.mkdir(sequence_save_path)
-                            except FileExistsError or FileNotFoundError:
-                                pass
+                    if index in self.quant_test[:, 0]:
+                        if index in self.quant_test[:,0]:
+                            list_of_sub_batch_trials_to_test = [i[1] for i in self.quant_test if i[0] == index]
+                            for test_trial in list_of_sub_batch_trials_to_test:
+                                sequence_save_path = qual_save_path + "batch_" + str(index) + "sub_batch_" + str(test_trial) + "/"
+                                try:
+                                    os.mkdir(sequence_save_path)
+                                except FileExistsError or FileNotFoundError:
+                                    pass
 
-                            for i in range(self.n_future):
-                                plt.figure(1)
-                                f, axarr = plt.subplots(1, 3)
-                                axarr[0].set_title("predictions: t_" + str(i))
-                                axarr[0].imshow(np.array(predictions[i][test_trial].permute(1, 2, 0).cpu().detach()))
-                                axarr[1].set_title("ground truth: t_" + str(i))
-                                axarr[1].imshow(np.array(images[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
-                                axarr[2].set_title("Occluded input: t_" + str(i))
-                                axarr[2].imshow(np.array(images_occ[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
-                                plt.savefig(sequence_save_path + "scene_time_step_" + str(i) + ".png")
-                                np.save(sequence_save_path + "pred_scene_time_step_" + str(i), np.array(predictions[i][test_trial].permute(1, 2, 0).cpu().detach()))
-                                np.save(sequence_save_path + "gt_scene_time_step_" + str(i), np.array(images[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
-                                if self.occlusion_test:
-                                    np.save(sequence_save_path + "occluded_scene_time_step_" + str(i), np.array(images_occ[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
-                                plt.close('all')
+                                for i in range(self.n_future):
+                                    plt.figure(1)
+                                    if self.occlusion_test and not self.tactile_qual_analysis:
+                                        f, axarr = plt.subplots(1, 3)
+                                        axarr[2].set_title("Occluded input: t_" + str(i))
+                                        axarr[2].imshow(np.array(images_occ[i + self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    if self.occlusion_test and self.tactile_qual_analysis:
+                                        f, axarr = plt.subplots(1, 4)
+                                        axarr[2].set_title("Occluded input: t_" + str(i))
+                                        axarr[2].imshow(np.array(images_occ[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
+                                        # add tactile plots
+                                        print(tactile_predictions.shape, tactile.shape)
+                                        print("hi")
+
+                                    else:
+                                        f, axarr = plt.subplots(1, 2)
+                                    axarr[0].set_title("predictions: t_" + str(i))
+                                    axarr[0].imshow(np.array(predictions[i][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    axarr[1].set_title("ground truth: t_" + str(i))
+                                    axarr[1].imshow(np.array(images[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    plt.savefig(sequence_save_path + "scene_time_step_" + str(i) + ".png")
+
+                                    np.save(sequence_save_path + "pred_scene_time_step_" + str(i), np.array(predictions[i][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    np.save(sequence_save_path + "gt_scene_time_step_" + str(i), np.array(images[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    if self.occlusion_test:
+                                        np.save(sequence_save_path + "occluded_scene_time_step_" + str(i), np.array(images_occ[i+self.n_past][test_trial].permute(1, 2, 0).cpu().detach()))
+                                    plt.close('all')
 
     def format_and_run_batch(self, batch_features, test, qualitative=False):
         mae, kld, mae_tactile, predictions, tactile_predictions, tactile, scene_occ = None, None, None, None, None, None, None
@@ -581,11 +595,12 @@ class UniversalTester():
 @click.option('--model_stage', type=click.Path(), default="", help='what stage of model should you test? BEST, stage1 etc.')
 @click.option('--model_folder_name', type=click.Path(), default="model_21_04_2022_09_48", help='Folder name where the model is stored')
 @click.option('--test_folder_name', type=click.Path(), default="test_no_new_formatted", help='Folder name where the test data is stored, test_no_new_formatted, test_novel_formatted')
-@click.option('--quant_analysis', type=click.BOOL, default=True, help='Perform quantitative analysis on the test data')
+@click.option('--quant_analysis', type=click.BOOL, default=False, help='Perform quantitative analysis on the test data')
 @click.option('--qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
+@click.option('--tactile_qual_analysis', type=click.BOOL, default=True, help='Perform qualitative analysis on the test data')
 @click.option('--test_sample_time_step', type=click.Path(), default="[1, 2, 10]", help='which time steps in prediciton sequence to calculate performance metrics for.')
 @click.option('--model_name_save_appendix', type=click.Path(), default = "", help = "What to add to the save file to identify the model as a specific subset, _1c")
-def main(model_name, model_stage, model_folder_name, test_folder_name, quant_analysis, qual_analysis, test_sample_time_step, model_name_save_appendix):
+def main(model_name, model_stage, model_folder_name, test_folder_name, quant_analysis, qual_analysis, tactile_qual_analysis, test_sample_time_step, model_name_save_appendix):
     # model names: SVG, SVTG_SE, SPOTS_SVG_ACTP
     model_save_path = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/" + model_name + "/" + model_folder_name + "/"
     test_data_dir  = "/home/user/Robotics/Data_sets/PRI/object1_motion1/" + test_folder_name + "/"
@@ -678,7 +693,7 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, quant_ana
     # [91, 0], [91, 1], [91, 2], [91, 3], [91, 4], [91, 5], [91, 6], [91, 7],
     # [97, 0], [97, 1], [97, 2], [97, 3], [97, 4], [97, 5]])  # -- very good one I think...
 
-    MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, quant_test, model_name_save_appendix)
+    MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, tactile_qual_analysis, quant_test, model_name_save_appendix)
 
 
 if __name__ == '__main__':
