@@ -57,7 +57,7 @@ class Model:
         self.training_stages = features["training_stages"]
         self.training_stages_epochs = features["training_stages_epochs"]
         self.tactile_size = features["tactile_size"]
-        self.model_name_save_appendix = features["model_name_save_appendix"]
+        # self.model_name_save_appendix = features["model_name_save_appendix"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
