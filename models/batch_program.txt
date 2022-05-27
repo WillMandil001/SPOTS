@@ -1,0 +1,72 @@
+#!/bin/sh
+
+# TESTING
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_16_39"
+# # python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_17_58"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_18_11"
+# python universal_model_tester.py --model_name="SVTG_SE" --model_name_save_appendix="large" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_19_53"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_12_41"
+# # python universal_model_tester.py --model_name="SPOTS_SVG_ACTP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_10_42"
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_15_19"
+# python universal_model_tester.py --model_name="SVG_TC" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_09"
+# python universal_model_tester.py --model_name="SVG_TC_TE" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_59"
+
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_16_39"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_17_58"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_18_11"
+# python universal_model_tester.py --model_name="SVTG_SE" --model_name_save_appendix="large" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_19_53"
+# # python universal_model_tester.py --model_name="SPOTS_SVG_ACTP" --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name=""
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_12_41"
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_15_19"
+# python universal_model_tester.py --model_name="SVG_TC" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_09"
+# python universal_model_tester.py --model_name="SVG_TC_TE" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_59"
+
+
+
+# # to run next: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  RUN THIS NEXT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# python universal_model_trainer.py --model_name="SVG_TE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="SPOTS_VG_ACTP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+
+
+# TRAINING
+# python universal_model_trainer.py --model_name="SVG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --model_name_save_appendix="large" --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP_STP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="VG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="VTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+# python universal_model_trainer.py --model_name="SPOTS_VG_ACTP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_100p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_100p/";
+
+# Scene Synthesis
+# python universal_model_trainer.py --model_name="SVG" --batch_size=8 --epochs=75 --n_past=2 --n_future=27 --n_eval=29 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_trial_per_sequence/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_trial_per_sequence/";
+# python universal_model_trainer.py --model_name="SVG_TC" --batch_size=8 --epochs=75 --n_past=2 --n_future=27 --n_eval=29 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_trial_per_sequence/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_trial_per_sequence/";
+# python universal_model_trainer.py --model_name="SVG_TC_TE" --batch_size=8 --epochs=75 --n_past=2 --n_future=27 --n_eval=29 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_trial_per_sequence/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_trial_per_sequence/";
+
+# learning rate / dataset size test:
+# python universal_model_trainer.py --model_name="SVG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_80p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_80p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_80p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_80p/";
+python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP_STP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_80p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_80p/";
+
+# python universal_model_trainer.py --model_name="SVG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_60p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_60p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_60p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_60p/";
+python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP_STP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_60p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_60p/";
+
+# python universal_model_trainer.py --model_name="SVG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_40p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_40p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_40p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_40p/";
+python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP_STP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_40p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_40p/";
+
+# python universal_model_trainer.py --model_name="SVG" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_20p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_20p/";
+# python universal_model_trainer.py --model_name="SVTG_SE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_20p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_20p/";
+python universal_model_trainer.py --model_name="SPOTS_SVG_ACTP_STP" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_20p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_20p/";
+
+
+
+python universal_model_trainer.py --model_name="SVG_TE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_80p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_80p/";
+python universal_model_trainer.py --model_name="SVG_TE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_60p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_60p/";
+python universal_model_trainer.py --model_name="SVG_TE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_40p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_40p/";
+python universal_model_trainer.py --model_name="SVG_TE" --epochs=75 --train_data_dir="/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_20p/" --scaler_dir="/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_20p/";
+

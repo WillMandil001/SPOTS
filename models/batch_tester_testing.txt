@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# TESTING
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_16_39"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_17_58"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_18_11"
+# python universal_model_tester.py --model_name="SVTG_SE" --model_name_save_appendix="large" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_19_53"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_12_41"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_20_35"
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_15_19"
+# python universal_model_tester.py --model_name="SVG_TC" --test_folder_name="test_formatted_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_09"
+# python universal_model_tester.py --model_name="SVG_TC_TE" --test_folder_name="test_formatted_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_59"
+
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_16_39"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_17_58"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_18_11"
+# python universal_model_tester.py --model_name="SVTG_SE" --model_name_save_appendix="large" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_19_53"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_12_41"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP" --model_stage="BEST" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_20_35"
+
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_15_19"
+# python universal_model_tester.py --model_name="SVG_TC" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_09"
+# python universal_model_tester.py --model_name="SVG_TC_TE" --test_folder_name="test_edge_case_trail_trial_per_sequence" --scalar_folder_name="scalars_trial_per_sequence" --model_folder_name="model_18_05_2022_16_59"
+
+
+# Full test set cases:
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_23_12"
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_01_49"
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_03_48"
+# python universal_model_tester.py --model_name="SVG" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_05_09"
+
+
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_01_15"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_02_30"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_03_27"
+# python universal_model_tester.py --model_name="SVG_TE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_04_06"
+
+
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_00_27"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_02_46"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_04_27"
+# python universal_model_tester.py --model_name="SVTG_SE" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_05_30"
+
+
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_22_28"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_23_33"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_00_22"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --model_stage="BEST" --test_folder_name="test_formatted_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_00_56"
+
+
+# # Edge cases:
+# python universal_model_tester.py --model_name="SVG" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_23_12"
+# python universal_model_tester.py --model_name="SVG" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_01_49"
+# python universal_model_tester.py --model_name="SVG" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_03_48"
+# python universal_model_tester.py --model_name="SVG" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_05_09"
+
+
+# python universal_model_tester.py --model_name="SVG_TE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_17_58"
+# python universal_model_tester.py --model_name="SVG_TE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_01_15"
+# python universal_model_tester.py --model_name="SVG_TE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_02_30"
+# python universal_model_tester.py --model_name="SVG_TE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_03_27"
+# python universal_model_tester.py --model_name="SVG_TE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_04_06"
+
+
+# python universal_model_tester.py --model_name="SVTG_SE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_17_05_2022_18_11"
+# python universal_model_tester.py --model_name="SVTG_SE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_00_27"
+# python universal_model_tester.py --model_name="SVTG_SE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_02_46"
+# python universal_model_tester.py --model_name="SVTG_SE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_04_27"
+# python universal_model_tester.py --model_name="SVTG_SE" --qual_analysis=True --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_05_30"
+
+
+python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --qual_analysis=True --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_12_41"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --qual_analysis=True --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_22_28"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --qual_analysis=True --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_18_05_2022_23_33"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --qual_analysis=True --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_00_22"
+# python universal_model_tester.py --model_name="SPOTS_SVG_ACTP_STP" --qual_analysis=True --model_stage="BEST" --test_folder_name="test_edge_case_100p" --scalar_folder_name="scalars_100p" --model_folder_name="model_19_05_2022_00_56"
