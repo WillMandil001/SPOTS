@@ -252,7 +252,25 @@ class Model:
         outputs_tactile = [last_output_tactile] + outputs_tactile
 
         if test is False:
-            if stage == "scene_only":
+            if stage == "":
+                loss_scene = mae_scene + (kld_scene * self.beta)
+                loss_tactile = mae_tactile + (kld_tactile * self.beta)
+                combined_loss = loss_scene + loss_tactile
+                combined_loss.backward()
+
+                self.frame_predictor_optimizer_scene.step()
+                self.encoder_optimizer_scene.step()
+                self.decoder_optimizer_scene.step()
+
+                self.frame_predictor_optimizer_tactile.step()
+
+                self.MMFM_scene_optimizer.step()
+                self.MMFM_tactile_optimizer.step()
+
+                self.posterior_optimizer.step()
+                self.prior_optimizer.step()
+
+            elif stage == "scene_only":
                 loss_scene = mae_scene + (kld_scene * self.beta)
                 loss_scene.backward()
 
@@ -331,7 +349,7 @@ class Model:
         self.posterior.eval()
         self.prior.eval()
 
-    def save_model(self, stage):
+    def save_model(self, stage="best"):
         if stage == "best":
             save_name = "SPOTS_SVG_ACTP_BEST"
         elif stage == "scene_only":

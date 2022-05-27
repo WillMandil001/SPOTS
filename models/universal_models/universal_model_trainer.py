@@ -19,7 +19,13 @@ import torchvision
 # standard video and tactile prediction models:
 from universal_networks.SVG import Model as SVG
 from universal_networks.SVTG_SE import Model as SVTG_SE
+from universal_networks.VTG_SE import Model as VTG_SE
 from universal_networks.SPOTS_SVG_ACTP import Model as SPOTS_SVG_ACTP
+from universal_networks.SPOTS_SVG_PTI_ACTP import Model as SPOTS_SVG_PTI_ACTP
+from universal_networks.SPOTS_SVG_ACTP_STP import Model as SPOTS_SVG_ACTP_STP
+
+# Tactile enhanced models:
+from universal_networks.SVG_TE import Model as SVG_TE
 
 # tactile conditioned models:
 from universal_networks.SVG_TC import Model as SVG_TC
@@ -53,6 +59,7 @@ class BatchGenerator:
             reader = csv.reader(f)
             for row in reader:
                 self.data_map.append(row)
+        print("self.data_map: ", len(self.data_map))
 
     def load_full_data(self):
         dataset_train = FullDataSet(self.data_map, self.train_data_dir, train=True, train_percentage=self.train_percentage, image_size=self.image_size, occlusion_test=self.occlusion_test, occlusion_size=self.occlusion_size)
@@ -65,12 +72,15 @@ class BatchGenerator:
 
 
 class FullDataSet:
-    def __init__(self, data_map, test_data_dir, occlusion_size=0, image_size=64, occlusion_test=False):
-        self.occlusion_test = occlusion_test
-        self.test_data_dir = test_data_dir
+    def __init__(self, data_map, train_data_dir, train=False, validation=False, train_percentage=1.0, image_size=64, occlusion_test=False, occlusion_size=0):
         self.image_size = image_size
+        self.train_data_dir = train_data_dir
+        self.occlusion_test = occlusion_test
         self.occlusion_size = occlusion_size
-        self.samples = data_map[1:]
+        if train:
+            self.samples = data_map[1:int((len(data_map) * train_percentage))]
+        if validation:
+            self.samples = data_map[int((len(data_map) * train_percentage)): -1]
         data_map = None
 
     def __len__(self):
@@ -78,28 +88,30 @@ class FullDataSet:
 
     def __getitem__(self, idx):
         value = self.samples[idx]
-        robot_data = np.load(self.test_data_dir + value[0])
+        robot_data = np.load(self.train_data_dir + value[0])
 
-        tactile_data = np.load(self.test_data_dir + value[1])
+        tactile_data = np.load(self.train_data_dir + value[1])
         tactile_images = []
         for tactile_data_sample in tactile_data:
             tactile_images.append(create_image(tactile_data_sample, image_size=self.image_size))
 
         images = []
         occ_images = []
-        if self.occlusion_test:
-            # random start point:
-            min_pixel = int(((self.occlusion_size / 2) + 1))
-            max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+        # random start point:
+        min_pixel = int(((self.occlusion_size / 2) + 1))
+        max_pixel = int(self.image_size - ((self.occlusion_size / 2) + 1))
+        if min_pixel >= max_pixel:
+            rand_x = None
+            rand_y = None
+        else:
             rand_x = random.randint(min_pixel, max_pixel)
             rand_y = random.randint(min_pixel, max_pixel)
-        for image_name in np.load(self.test_data_dir + value[2]):
-            images.append(np.load(self.test_data_dir + image_name))
-            if self.occlusion_test:
-                occ_images.append(self.add_occlusion(np.load(self.test_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
+        for image_name in np.load(self.train_data_dir + value[2]):
+            images.append(np.load(self.train_data_dir + image_name))
+            occ_images.append(self.add_occlusion(np.load(self.train_data_dir + image_name), min_pixel, max_pixel, rand_x, rand_y))
 
-        experiment_number = np.load(self.test_data_dir + value[3])
-        time_steps = np.load(self.test_data_dir + value[4])
+        experiment_number = np.load(self.train_data_dir + value[3])
+        time_steps = np.load(self.train_data_dir + value[4])
         return [robot_data.astype(np.float32), np.array(images).astype(np.float32), np.array(tactile_images).astype(np.float32), np.array(tactile_data).astype(np.float32), experiment_number, time_steps, np.array(occ_images).astype(np.float32)]
 
     def add_occlusion(self, image, min_pixel, max_pixel, rand_x, rand_y):
@@ -189,14 +201,20 @@ class UniversalModelTrainer:
             self.model = SVG_occ(features)
         elif self.model_name == "SVTG_SE":
             self.model = SVTG_SE(features)
+        elif self.model_name == "VTG_SE":
+            self.model = VTG_SE(features)
         elif self.model_name == "SVTG_SE_occ":
             self.model = SVTG_SE_occ(features)
         elif self.model_name == "SPOTS_SVG_ACTP":
             self.model = SPOTS_SVG_ACTP(features)
+        elif self.model_name == "SPOTS_SVG_PTI_ACTP":
+            self.model = SPOTS_SVG_PTI_ACTP(features)
         elif self.model_name == "SVG_TC":
             self.model = SVG_TC(features)
         elif self.model_name == "SVG_TC_TE":
             self.model = SVG_TC_TE(features)
+        elif self.model_name == "SVG_TE":
+            self.model = SVG_TE(features)
         elif self.model_name == "VG":
             self.model = VG(features)
         elif self.model_name == "VG_MMMM":
@@ -209,6 +227,10 @@ class UniversalModelTrainer:
             self.model = SVG_TC_occ(features)
         elif self.model_name == "SVG_TC_TE_occ":
             self.model = SVG_TC_TE_occ(features)
+        elif self.model_name == "SPOTS_SVG_ACTP_STP":
+            self.model = SPOTS_SVG_ACTP_STP(features)
+
+        print(features)
 
         self.model.initialise_model()
 
@@ -354,6 +376,13 @@ class UniversalModelTrainer:
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, predictions = self.model.run(scene=images, actions=action, test=test)
 
+        elif self.model_name == "VTG_SE":
+            images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(self.device)
+            action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            scene_and_touch = torch.cat((tactile, images), 2)
+            mae, predictions = self.model.run(scene_and_touch=scene_and_touch, actions=action, test=test)
+
         elif self.model_name == "SVTG_SE":
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(self.device)
@@ -370,7 +399,7 @@ class UniversalModelTrainer:
             scene_and_touch_gt = torch.cat((tactile, images), 2)
             mae, kld, predictions = self.model.run(scene_and_touch=scene_and_touch, scene_and_touch_gt=scene_and_touch_gt, actions=action, test=test)
 
-        elif self.model_name == "SPOTS_SVG_ACTP":
+        elif self.model_name == "SPOTS_SVG_ACTP" or self.model_name == "SPOTS_SVG_PTI_ACTP" or self.model_name == "SPOTS_SVG_ACTP_STP":
             action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
@@ -389,7 +418,7 @@ class UniversalModelTrainer:
             tactile = torch.flatten (batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
             mae, mae_tactile, predictions, tactile = self.model.run(scene=images, tactile=tactile, actions=action,gain=self.gain, test=test, stage=self.stage)
 
-        elif self.model_name == "SVG_TC" or self.model_name == "SVG_TC_TE":
+        elif self.model_name == "SVG_TC" or self.model_name == "SVG_TC_TE" or self.model_name == "SVG_TE":
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = torch.flatten(batch_features[3].permute(1, 0, 2, 3).to(self.device), start_dim=2)
             action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
@@ -407,7 +436,7 @@ class UniversalModelTrainer:
 
 @click.command()
 @click.option('--model_name', type=click.Path(), default="SVG", help='Set name for prediction model, SVG, SVTG_SE, SPOTS_SVG_ACTP, SVG_TC')
-@click.option('--batch_size', type=click.INT, default=8, help='Batch size for training.')
+@click.option('--batch_size', type=click.INT, default=128, help='Batch size for training.')
 @click.option('--lr', type=click.FLOAT, default = 0.0001, help = "learning rate")
 @click.option('--beta1', type=click.FLOAT, default = 0.9, help = "Beta gain")
 @click.option('--log_dir', type=click.Path(), default = 'logs/lp', help = "Not sure :D")
@@ -415,10 +444,10 @@ class UniversalModelTrainer:
 @click.option('--niter', type=click.INT, default = 300, help = "")
 @click.option('--seed', type=click.INT, default = 1, help = "")
 @click.option('--image_width', type=click.INT, default = 64, help = "Size of scene image data")
-@click.option('--dataset', type=click.Path(), default = 'object1_motion1', help = "name of the dataset")
-@click.option('--n_past', type=click.INT, default = 1, help = "context sequence length")
+@click.option('--dataset', type=click.Path(), default = 'Dataset3_MarkedHeavyBox', help = "name of the dataset")
+@click.option('--n_past', type=click.INT, default = 2, help = "context sequence length")
 @click.option('--n_future', type=click.INT, default = 5, help = "time horizon sequence length")
-@click.option('--n_eval', type=click.INT, default = 6, help = "sum of context and time horizon")
+@click.option('--n_eval', type=click.INT, default = 7, help = "sum of context and time horizon")
 @click.option('--prior_rnn_layers', type=click.INT, default = 3, help = "number of LSTMs in the prior model")
 @click.option('--posterior_rnn_layers', type=click.INT, default = 3, help = "number of LSTMs in the posterior model")
 @click.option('--predictor_rnn_layers', type=click.INT, default = 4, help = "number of LSTMs in the frame predictor model")
@@ -439,17 +468,17 @@ class UniversalModelTrainer:
 @click.option('--out_channels', type=click.INT, default = 3, help = "output channels")
 @click.option('--training_stages', type=click.Path(), default = "", help = "define the training stages - if none leave blank - available: 3part")
 @click.option('--training_stages_epochs', type=click.Path(), default = "50,75,125", help = "define the end point of each training stage")
-@click.option('--num_workers', type=click.INT, default = 5, help = "number of workers used by the data loader")
-@click.option('--model_save_path', type=click.Path(), default = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/", help = "")
-@click.option('--train_data_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted/", help = "")
-@click.option('--scaler_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/", help = "")
+@click.option('--num_workers', type=click.INT, default = 12, help = "number of workers used by the data loader")
+@click.option('--model_save_path', type=click.Path(), default = "/home/willmandil/Robotics/SPOTS/models/universal_models/saved_models/", help = "")
+@click.option('--train_data_dir', type=click.Path(), default = "/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_trial_per_sequence/", help = "")
+@click.option('--scaler_dir', type=click.Path(), default = "/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_trial_per_sequence/", help = "")
 @click.option('--model_name_save_appendix', type=click.Path(), default = "", help = "What to add to the save file to identify the model as a specific subset (_1c= 1 conditional frame, GTT=groundtruth tactile data)")
 @click.option('--tactile_encoder_hidden_size', type=click.INT, default = 0, help = "Size of hidden layer in tactile encoder, 200")
 @click.option('--tactile_encoder_output_size', type=click.INT, default = 0, help = "size of output layer from tactile encoder, 100")
 @click.option('--occlusion_test', type=click.BOOL, default = False, help = "if you would like to train for occlusion")
 @click.option('--occlusion_gain_per_epoch', type=click.FLOAT, default = 0.05, help = "increasing size of the occlusion block per epoch 0.1=(0.1 x MAX) each epoch")
-@click.option('--occlusion_start_epoch', type=click.INT, default = 20, help = "size of output layer from tactile encoder, 100")
-@click.option('--occlusion_max_size', type=click.FLOAT, default = 1.0, help = "max size of the window as a % of total size (0.5 = 50% of frame (32x32 squares in ))")
+@click.option('--occlusion_start_epoch', type=click.INT, default = 35, help = "size of output layer from tactile encoder, 100")
+@click.option('--occlusion_max_size', type=click.FLOAT, default = 0.4, help = "max size of the window as a % of total size (0.5 = 50% of frame (32x32 squares in ))")
 def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, image_width, dataset,
          n_past, n_future, n_eval, prior_rnn_layers, posterior_rnn_layers, predictor_rnn_layers, state_action_size,
          z_dim, beta, data_threads, num_digits, last_frame_skip, epochs, train_percentage, validation_percentage,
@@ -457,7 +486,15 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
          num_workers, model_save_path, train_data_dir, scaler_dir, model_name_save_appendix, tactile_encoder_hidden_size,
          tactile_encoder_output_size, occlusion_test, occlusion_gain_per_epoch, occlusion_start_epoch, occlusion_max_size):
 
-    occlusion_test=True
+    # Home PC:
+    # /home/user/Robotics/SPOTS/models/universal_models/saved_models/
+    # /home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted/
+    # /home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/
+
+    # Lab PC
+    # /home/willmandil/Robotics/SPOTS/models/universal_models/saved_models/
+    # /home/willmandil/Robotics/Data_sets/PRI/object1_motion1_position1/train_formatted/
+    # /home/willmandil/Robotics/Data_sets/PRI/object1_motion1_position1/scalars/
 
     # unique save title:
     model_save_path = model_save_path + model_name
@@ -481,25 +518,37 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         out_channels = 3
         training_stages = [""]
         training_stages_epochs = [epochs]
-    elif model_name == "SVTG_SE" or model_name == "SVTG_SE_occ":
-        g_dim = 256 * 2
-        rnn_size = 256 * 2
+    elif model_name == "SVTG_SE" or model_name == "SVTG_SE_occ" or model_name == "VTG_SE":
+        if model_name_save_appendix== "large":
+            g_dim = 256 * 4
+            rnn_size = 256 * 4
+        else:
+            g_dim = 256 * 2
+            rnn_size = 256 * 2
         channels = 6
         out_channels = 6
         training_stages = [""]
         training_stages_epochs = [epochs]
         tactile_size = [image_width, image_width]
-    elif model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" or model_name == "SPOTS_SVG_ACTP_occ":
+    elif model_name == "SPOTS_SVG_ACTP" or model_name == "SPOTS_VG_ACTP" or model_name == "SPOTS_SVG_ACTP_occ" or model_name == "SPOTS_SVG_PTI_ACTP"  or model_name == "SPOTS_SVG_ACTP_STP":
         g_dim = 256
         rnn_size = 256
         channels = 3
         out_channels = 3
-        training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
-        training_stages_epochs = [35, 65, 150]
-        # training_stages_epochs = [50, 75, 125]
+        training_stages = [""]
+        training_stages_epochs = [epochs]
         tactile_size = 48
-        epochs = training_stages_epochs[-1] + 1
-    elif model_name == "SVG_TC_TE" or model_name == "SVG_TC_TE_occ":
+
+        # g_dim = 256
+        # rnn_size = 256
+        # channels = 3
+        # out_channels = 3
+        # training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
+        # training_stages_epochs = [35, 65, 150]
+        # # training_stages_epochs = [50, 75, 125]
+        # tactile_size = 48
+        # epochs = training_stages_epochs[-1] + 1
+    elif model_name == "SVG_TC_TE" or model_name == "SVG_TC_TE_occ" or model_name == "SVG_TE":
         g_dim = 256
         rnn_size = 256
         channels = 3
