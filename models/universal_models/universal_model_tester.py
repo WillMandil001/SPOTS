@@ -232,7 +232,6 @@ class FullDataSet:
                         pass  # out of bounds
         return image
 
-
 def create_image(tactile, image_size):
     # convert tactile data into an image:
     image = np.zeros((4, 4, 3), np.float32)
@@ -305,7 +304,7 @@ class UniversalTester():
         self.predictor_rnn_layers = features["predictor_rnn_layers"]
         self.validation_percentage = features["validation_percentage"]
         self.training_stages_epochs = features["training_stages_epochs"]
-        self.model_name_save_appendix = features["model_name_save_appendix"]
+        # self.model_name_save_appendix = features["model_name_save_appendix"]
 
         try:
             self.occlusion_test = features["occlusion_test"]
@@ -318,6 +317,9 @@ class UniversalTester():
             self.occlusion_max_size = 0
             self.occlusion_start_epoch = 0
             self.occlusion_gain_per_epoch = 0
+            self.occlusion_size = None
+
+        print(self.occlusion_test)
 
         self.scene_loss_titles = ["Scene MAE: "] + ["Scene MAE T" + str(i) + ": " for i in range(self.n_future)] + ["Scene MSE: "] + ["Scene MSE T" + str(i) + ": " for i in range(self.n_future)] + ["Scene PSNR: "] +  ["Scene PSNR T" + str(i) + ": " for i in range(self.n_future)] + ["Scene SSIM: "] + ["Scene SSIM T" + str(i) + ": " for i in range(self.n_future)]
         self.tactile_loss_titles = ["Tactile MAE: ", "Tactile MAE T1: ", "Tactile MAE T5: ", "Tactile MAE T10: ",
@@ -699,6 +701,11 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, scalar_fo
     test_data_dir   =  test_data_dir + test_folder_name + "/"
     scaler_dir      = scaler_dir + model_folder_name + "/"
 
+    # Lab PC
+    # model_save_path = "/home/willmandil/Robotics/SPOTS/models/universal_models/saved_models/" + model_name + "/" + model_folder_name + "/"
+    # test_data_dir   = "/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_position1/" + test_folder_name + "/"
+    # scaler_dir      = "/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_position1/scalars/"
+
     data_save_path = model_save_path + "performance_data/"
     try:
         os.mkdir(data_save_path)
@@ -709,10 +716,8 @@ def main(model_name, model_stage, model_folder_name, test_folder_name, scalar_fo
         model_save_name = model_name + "_" + model_stage
     else:
         model_save_name = model_name + "_model"
-
     print(model_save_name)
     print(test_folder_name)
-
     quant_test = np.array([[0, i] for i in range(0, 63, 3)])
 
     MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, qual_tactile_analysis, quant_test, model_name_save_appendix)
@@ -795,6 +800,53 @@ if __name__ == '__main__':
     # [91, 0], [91, 1], [91, 2], [91, 3], [91, 4], [91, 5], [91, 6], [91, 7],
     # [97, 0], [97, 1], [97, 2], [97, 3], [97, 4], [97, 5]])
 
+
+    MT = UniversalTester(data_save_path, model_save_path, test_data_dir, scaler_dir, model_save_name, model_folder_name, test_folder_name, model_stage, quant_analysis, qual_analysis, qual_tactile_analysis, quant_test, model_name_save_appendix)
+
+
+if __name__ == '__main__':
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    main()
+
+    # [batch, trial]
+    # LIST_T = []
+    # for i in range(50,100):
+    #     for j in range(8):
+    #         LIST_T = LIST_T + [[i, j]]
+    # quant_test = np.array(LIST_T)
+    # print(quant_test)
+
+    # quant_test = np.array([[8, 7], [9, 3],
+    # [11, 0], [11, 1], [11, 2], [11, 3], [11, 4], [11, 5],
+    # [15, 2], [15, 5], [15, 6], [15, 7],
+    # [16, 7], [17, 1],
+    # [19, 0], [19, 1], [19, 2], [19, 3], [19, 4],
+    # [20, 5], [20, 6], [21, 3], [21, 4], [21, 5],
+    # [22, 5], [22, 6], [22, 7], [23, 1], [23, 2], [23, 3], [23, 4], [23, 5],
+    # [30, 3], [30, 4], [30, 5], [30, 6], [30, 7],
+    # [34, 6], [24, 7], [35, 0], [35, 2], [35, 3], [35, 4], [35, 5], [35, 6],
+    # [36, 3], [36, 4], [36, 5], [36, 6], [36, 7], [37, 0], [37, 1], [37, 2], [37, 3], [37, 4], [37, 5], [37, 6], [37, 7],
+    # [43, 0], [43, 1], [43, 2], [43, 3], [43, 5],
+    # [44, 5], [44, 6], [44, 7], [45, 0], [45, 1], [45, 2], [45, 3], [45, 4],
+    # [47, 1], [47, 2], [47, 3], [47, 4], [47, 5], [47, 6], [47, 7],
+    # [49, 0], [49, 1], [49, 2], [49, 3], [49, 4], [49, 5], [49, 6], [49, 7],
+    # [51, 0], [51, 1], [51, 2], [51, 3], [51, 4], [51, 5], [51, 6], [51, 7],
+    # [54, 6], [54, 7], [55, 0], [55, 1], [55, 2], [55, 3], [55, 4], [55, 5], [51, 6], [51, 7],
+    # [61, 1], [61, 2], [61, 3], [61, 4], [61, 5], [61, 6], [61, 7],
+    # [63, 1], [63, 2], [63, 3], [63, 4], [63, 5], [63, 6], [63, 7],
+    # [64, 4], [64, 5], [64, 6], [64, 7], [65, 0], [65, 1], [65, 2], [65, 3], [65, 4], [65, 5], [65, 6], [65, 7],
+    # [67, 4], [67, 5], [67, 6], [67, 7],
+    # [68, 4], [68, 5], [68, 6], [68, 7], [69, 0], [69, 1], [69, 2], [69, 3], [69, 4], [69, 5], [69, 6], [69, 7],
+    # [70, 5], [70, 6], [70, 7], [71, 0], [71, 1], [71, 2], [71, 3], [71, 4], [71, 5], [71, 6], [71, 7],
+    # [72, 3], [72, 4], [72, 5], [72, 6], [72, 7], [73, 0], [73, 1], [73, 2], [73, 3], [73, 4], [73, 5], [73, 6],
+    # [75, 0], [75, 1], [75, 2], [75, 3], [75, 4], [75, 5], [75, 6], [75, 7],
+    # [77, 0], [77, 1], [77, 2], [77, 3], [77, 4], [77, 5], [77, 6], [77, 7],
+    # [78, 6], [78, 7], [79, 0], [79, 1], [79, 2], [79, 3], [79, 4], [79, 5], [79, 6], [79, 7],
+    # [82, 7], [83, 0], [83, 1], [83, 2], [83, 3], [83, 4], [83, 3], [83, 4], [83, 5], [83, 6], [83, 7],
+    # [85, 0], [85, 1], [85, 2], [85, 3], [85, 4], [85, 5], [85, 6], [85, 7],
+    # [88, 5], [88, 6], [88, 7], [89, 0], [89, 1], [89, 2], [89, 3], [89, 4], [89, 5], [89, 6], [89, 7],
+    # [91, 0], [91, 1], [91, 2], [91, 3], [91, 4], [91, 5], [91, 6], [91, 7],
+    # [97, 0], [97, 1], [97, 2], [97, 3], [97, 4], [97, 5]])
 
     # [8, 7], [9, 3],
     # [11, 0], [11, 1], [11, 2], [11, 3], [11, 4], [11, 5],

@@ -17,6 +17,41 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 
+# lr=0.0001
+# beta1=0.9
+# batch_size=8
+# log_dir='logs/lp'
+# model_dir=''
+# name=''
+# data_root='data'
+# optimizer='adam'
+# niter=300
+# seed=1
+# epoch_size=600
+# image_width=64
+# channels=6
+# out_channels = 6
+# dataset='smmnist'
+# n_past=10
+# n_future=10
+# n_eval=20
+# rnn_size=256*2
+# prior_rnn_layers=3
+# posterior_rnn_layers=3
+# predictor_rnn_layers=4
+# state_action_size = 12
+# z_dim=10  # number of latent variables
+# g_dim=256*2  # 128
+# beta=0.0001  # was 0.0001
+# data_threads=5
+# num_digits=2
+# last_frame_skip = 'store_true'
+# epochs = 100
+
+# train_percentage = 0.9
+# validation_percentage = 0.1
+
+
 class Model:
     def __init__(self, features):
         self.features = features
@@ -54,14 +89,6 @@ class Model:
         self.model_name = features["model_name"]
         self.device = features["device"]
         self.model_name_save_appendix = features["model_name_save_appendix"]
-        self.tactile_encoder_hidden_size = features["tactile_encoder_hidden_size"]
-        self.tactile_encoder_output_size = features["tactile_encoder_output_size"]
-        self.tactile_size = features["tactile_size"]
-
-        self.occlusion_test = features["occlusion_test"]
-        self.occlusion_max_size = features["occlusion_max_size"]
-        self.occlusion_start_epoch = features["occlusion_start_epoch"]
-        self.occlusion_gain_per_epoch = features["occlusion_gain_per_epoch"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
@@ -78,51 +105,66 @@ class Model:
         self.prior = full_model["prior"]
         self.encoder = full_model["encoder"]
         self.decoder = full_model["decoder"]
-        self.tactile_encoder = full_model["tactile_encoder"]
 
         self.frame_predictor.cuda()
         self.posterior.cuda()
         self.prior.cuda()
         self.encoder.cuda()
         self.decoder.cuda()
-        self.tactile_encoder.cuda()
         self.mae_criterion.cuda()
 
     def initialise_model(self):
+        import universal_networks.dcgan_64 as model
         import universal_networks.lstm as lstm_models
-        self.frame_predictor = lstm_models.lstm(self.g_dim + self.tactile_encoder_output_size + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        import universal_networks.ACTP as ACTP_model
+        import universal_networks.lstm as lstm_models
+
+        self.frame_predictor = lstm_models.lstm(self.g_dim + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        self.frame_predictor.apply(utility_prog.init_weights)
+        self.frame_predictor_optimizer_scene = self.optimizer(self.frame_predictor.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.frame_predictor_scene.cuda()
+        self.mae_criterion_scene.cuda()
+        self.mae_criterion_tactile.cuda()
+
+        self.MMFM = model.MMFM(self.g_dim + self.tactile_size, self.g_dim + self.tactile_size, self.channels)
+        self.MMFM.apply(utility_prog.init_weights)
+        self.MMFM_optimizer = self.optimizer(self.MMFM.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.MMFM.cuda()
+
+        # SCENE:
+        self.encoder_scene = model.encoder(self.g_dim, self.channels)
+        self.decoder_scene = model.decoder(self.g_dim, self.channels)
+        self.encoder_scene.apply(utility_prog.init_weights)
+        self.decoder_scene.apply(utility_prog.init_weights)
+        self.encoder_optimizer_scene = self.optimizer(self.encoder_scene.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.decoder_optimizer_scene = self.optimizer(self.decoder_scene.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.encoder_scene.cuda()
+        self.decoder_scene.cuda()
+
+        # TACTILE:
+        self.encoder_tactile = model.encoder(self.g_dim, self.channels)
+        self.decoder_tactile = model.decoder(self.g_dim, self.channels)
+        self.encoder_tactile.apply(utility_prog.init_weights)
+        self.decoder_tactile.apply(utility_prog.init_weights)
+        self.encoder_optimizer_tactile = self.optimizer(self.encoder_tactile.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.decoder_optimizer_tactile = self.optimizer(self.decoder_tactile.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.encoder_tactile.cuda()
+        self.decoder_tactile.cuda()
+
+        # PRIOR:
         self.posterior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
         self.prior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
-        self.frame_predictor.apply(utility_prog.init_weights)
         self.posterior.apply(utility_prog.init_weights)
         self.prior.apply(utility_prog.init_weights)
-
-        import universal_networks.dcgan_64 as model
-        self.encoder = model.encoder(self.g_dim, self.channels)
-        self.decoder = model.decoder(self.g_dim, self.channels)
-        self.encoder.apply(utility_prog.init_weights)
-        self.decoder.apply(utility_prog.init_weights)
-        self.tactile_encoder = model.raw_tactile_encoder(input_dim=self.tactile_size, hidden_dim=self.tactile_encoder_hidden_size, out_dim=self.tactile_encoder_output_size)
-
-        self.frame_predictor_optimizer = self.optimizer(self.frame_predictor.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.posterior_optimizer = self.optimizer(self.posterior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.prior_optimizer = self.optimizer(self.prior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        self.encoder_optimizer = self.optimizer(self.encoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        self.decoder_optimizer = self.optimizer(self.decoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        self.tactile_encoder_optimizer = self.optimizer(self.tactile_encoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-
-        self.frame_predictor.cuda()
         self.posterior.cuda()
         self.prior.cuda()
-        self.encoder.cuda()
-        self.decoder.cuda()
-        self.tactile_encoder.cuda()
-        self.mae_criterion.cuda()
 
     def save_model(self):
-        torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'tactile_encoder': self.tactile_encoder,
-                    'frame_predictor': self.frame_predictor, 'posterior': self.posterior, 'prior': self.prior,
-                    'features': self.features}, self.model_dir + "SVG_TC_TE_occ_model" + self.model_name_save_appendix)
+        torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
+                    'posterior': self.posterior, 'prior': self.prior, 'features': self.features},
+                    self.model_dir + "SVTG_SE_model" + self.model_name_save_appendix)
 
     def set_train(self):
         self.frame_predictor.train()
@@ -130,7 +172,6 @@ class Model:
         self.prior.train()
         self.encoder.train()
         self.decoder.train()
-        self.tactile_encoder.train()
 
     def set_test(self):
         self.frame_predictor.eval()
@@ -138,11 +179,9 @@ class Model:
         self.prior.eval()
         self.encoder.eval()
         self.decoder.eval()
-        self.tactile_encoder.eval()
 
-    def run(self, scene, tactile, actions, scene_gt, gain=0.0, test=False, stage=False):
-        mae = 0
-        kld = 0
+    def run(self, scene_and_touch, actions, test=False):
+        mae, kld = 0, 0
         outputs = []
 
         self.frame_predictor.zero_grad()
@@ -155,21 +194,13 @@ class Model:
         self.posterior.hidden = self.posterior.init_hidden()
         self.prior.hidden = self.prior.init_hidden()
 
-        # prior
-        self.posterior.zero_grad()
-        self.prior.zero_grad()
-        self.posterior.hidden = self.posterior.init_hidden()
-        self.prior.hidden = self.prior.init_hidden()
-
         state = actions[0].to(self.device)
-        for index, (sample_scene, sample_tactile, sample_action) in enumerate(zip(scene[:-1], tactile[:-1], actions[1:])):
-            state_action = torch.cat((state, sample_action), 1)
+        for index, (sample_scene_and_touch, sample_action) in enumerate(zip(scene_and_touch[:-1], actions[1:])):
+            state_action = torch.cat((state, actions[index]), 1)
 
             if index > self.n_past - 1:  # horizon
                 h, skip = self.encoder(x_pred)
-                h_target = self.encoder(scene_gt[index + 1])[0]
-
-                tactile_enc = self.tactile_encoder(tactile[index])
+                h_target = self.encoder(scene_and_touch[index + 1])[0]
 
                 if test:
                     _, mu, logvar = self.posterior(h_target)  # learned prior
@@ -178,19 +209,16 @@ class Model:
                     z_t, mu, logvar = self.posterior(h_target)  # learned prior
                     _, mu_p, logvar_p = self.prior(h)  # learned prior
 
-                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action, tactile_enc], 1))  # prediction model
+                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action], 1))  # prediction model
                 x_pred = self.decoder([h_pred, skip])  # prediction model
 
-                mae += self.mae_criterion(x_pred, scene_gt[index + 1])  # prediction model
+                mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
                 kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
 
                 outputs.append(x_pred)
-
             else:  # context
-                h, skip = self.encoder(scene[index])
-                h_target = self.encoder(scene_gt[index + 1])[0]   # should this [0] be here????
-
-                tactile_enc = self.tactile_encoder(tactile[index])
+                h, skip = self.encoder(scene_and_touch[index])
+                h_target = self.encoder(scene_and_touch[index + 1])[0]   # should this [0] be here????
 
                 if test:
                     _, mu, logvar = self.posterior(h_target)  # learned prior
@@ -199,10 +227,10 @@ class Model:
                     z_t, mu, logvar = self.posterior(h_target)  # learned prior
                     _, mu_p, logvar_p = self.prior(h)  # learned prior
 
-                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action, tactile_enc], 1))  # prediction model
+                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action], 1))  # prediction model
                 x_pred = self.decoder([h_pred, skip])  # prediction model
 
-                mae += self.mae_criterion(x_pred, scene_gt[index + 1])  # prediction model
+                mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
                 kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
 
                 last_output = x_pred
@@ -218,7 +246,6 @@ class Model:
             self.prior_optimizer.step()
             self.encoder_optimizer.step()
             self.decoder_optimizer.step()
-            self.tactile_encoder_optimizer.step()
 
         return mae.data.cpu().numpy() / (self.n_past + self.n_future), kld.data.cpu().numpy() / (self.n_future + self.n_past), torch.stack(outputs)
 

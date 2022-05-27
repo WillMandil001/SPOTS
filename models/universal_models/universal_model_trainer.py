@@ -538,16 +538,16 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         training_stages = [""]
         training_stages_epochs = [epochs]
         tactile_size = 48
+        if training_stages == "3part"
+            g_dim = 256
+            rnn_size = 256
+            channels = 3
+            out_channels = 3
+            training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
+            training_stages_epochs = [35, 65, 150]
+            tactile_size = 48
+            epochs = training_stages_epochs[-1] + 1
 
-        # g_dim = 256
-        # rnn_size = 256
-        # channels = 3
-        # out_channels = 3
-        # training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
-        # training_stages_epochs = [35, 65, 150]
-        # # training_stages_epochs = [50, 75, 125]
-        # tactile_size = 48
-        # epochs = training_stages_epochs[-1] + 1
     elif model_name == "SVG_TC_TE" or model_name == "SVG_TC_TE_occ" or model_name == "SVG_TE":
         g_dim = 256
         rnn_size = 256
@@ -558,6 +558,7 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         tactile_size = 48
         tactile_encoder_hidden_size = 200
         tactile_encoder_output_size = 100
+
 
     torch.manual_seed(seed)
     torch.backends.cudnn.benchmark = False

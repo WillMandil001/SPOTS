@@ -57,7 +57,7 @@ class Model:
         self.training_stages = features["training_stages"]
         self.training_stages_epochs = features["training_stages_epochs"]
         self.tactile_size = features["tactile_size"]
-        # self.model_name_save_appendix = features["model_name_save_appendix"]
+        self.model_name_save_appendix = features["model_name_save_appendix"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
@@ -99,10 +99,10 @@ class Model:
         import universal_networks.lstm as lstm_models
 
         # SCENE:
-        self.frame_predictor_scene = lstm_models.lstm(self.g_dim + self.tactile_size + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        self.frame_predictor_scene = lstm_models.lstm(self.g_dim + (self.tactile_size * 2) + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
         self.frame_predictor_scene.apply(utility_prog.init_weights)
 
-        self.MMFM_scene = model.MMFM_scene(self.g_dim + self.tactile_size, self.g_dim + self.tactile_size, self.channels)
+        self.MMFM_scene = model.MMFM_scene(self.g_dim + (self.tactile_size * 2), self.g_dim + self.tactile_size, self.channels)
         self.MMFM_scene.apply(utility_prog.init_weights)
         self.MMFM_scene_optimizer = self.optimizer(self.MMFM_scene.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.MMFM_scene.cuda()
@@ -217,8 +217,12 @@ class Model:
                 h_scene, skip_scene = self.encoder_scene(scene[index])
                 h_target_scene      = self.encoder_scene(scene[index + 1])[0]
 
+                # Tactile Prediction
+                MM_rep_tactile = self.MMFM_tactile(h_scene_and_tactile)
+                x_pred_tactile = self.frame_predictor_tactile(MM_rep_tactile, state_action, tactile[index])  # prediction model
+
                 # cat scene and tactile together for crossover input to pipelines
-                h_scene_and_tactile = torch.cat([tactile[index], h_scene], 1)
+                h_scene_and_tactile = torch.cat([tactile[index], h_scene, x_pred_tactile], 1)
 
                 # Learned Prior - Z_t calculation
                 if test:
@@ -230,10 +234,7 @@ class Model:
 
                 # Multi-modal feature model:
                 MM_rep_scene = self.MMFM_scene(h_scene_and_tactile)
-                MM_rep_tactile = self.MMFM_tactile(h_scene_and_tactile)
 
-                # Tactile Prediction
-                x_pred_tactile = self.frame_predictor_tactile(MM_rep_tactile, state_action, tactile[index])  # prediction model
 
                 # Scene Prediction
                 h_pred_scene = self.frame_predictor_scene(torch.cat([MM_rep_scene, z_t, state_action], 1))  # prediction model
@@ -252,25 +253,7 @@ class Model:
         outputs_tactile = [last_output_tactile] + outputs_tactile
 
         if test is False:
-            if stage == "":
-                loss_scene = mae_scene + (kld_scene * self.beta)
-                loss_tactile = mae_tactile + (kld_tactile * self.beta)
-                combined_loss = loss_scene + loss_tactile
-                combined_loss.backward()
-
-                self.frame_predictor_optimizer_scene.step()
-                self.encoder_optimizer_scene.step()
-                self.decoder_optimizer_scene.step()
-
-                self.frame_predictor_optimizer_tactile.step()
-
-                self.MMFM_scene_optimizer.step()
-                self.MMFM_tactile_optimizer.step()
-
-                self.posterior_optimizer.step()
-                self.prior_optimizer.step()
-
-            elif stage == "scene_only":
+            if stage == "scene_only":
                 loss_scene = mae_scene + (kld_scene * self.beta)
                 loss_scene.backward()
 
@@ -349,15 +332,15 @@ class Model:
         self.posterior.eval()
         self.prior.eval()
 
-    def save_model(self, stage="best"):
+    def save_model(self, stage):
         if stage == "best":
-            save_name = "SPOTS_SVG_ACTP_BEST"
+            save_name = "SPOTS_SVG_PTI_ACTP_BEST"
         elif stage == "scene_only":
-            save_name = "SPOTS_SVG_ACTP_stage1"
+            save_name = "SPOTS_SVG_PTI_ACTP_stage1"
         elif stage == "tactile_loss_plus_scene_fixed":
-            save_name = "SPOTS_SVG_ACTP_stage2"
+            save_name = "SPOTS_SVG_PTI_ACTP_stage2"
         elif stage == "scene_loss_plus_tactile_gradual_increase":
-            save_name = "SPOTS_SVG_ACTP_stage3"
+            save_name = "SPOTS_SVG_PTI_ACTP_stage3"
 
         torch.save({"frame_predictor_tactile": self.frame_predictor_tactile,
                     "frame_predictor_scene": self.frame_predictor_scene, "encoder_scene": self.encoder_scene,
