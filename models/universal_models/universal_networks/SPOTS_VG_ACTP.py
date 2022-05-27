@@ -280,7 +280,7 @@ class Model:
         self.MMFM_scene.eval()
         self.MMFM_tactile.eval()
 
-    def save_model(self, stage):
+    def save_model(self, stage="best"):
         if stage == "best":
             save_name = "SPOTS_VG_ACTP_BEST"
         elif stage == "scene_only":
