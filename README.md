@@ -1,14 +1,28 @@
 ### Simultanious Prediction of Optical and Tactile Sensation.
-Training an agent to predict the effect of its actions with its environment is a core robotics challenge. Existing methods apply visual information and occasionally robot task space information. However, to reduce uncertainty when predicting the outcome of a robots interaction with its environment, the introduction of tactile sensation is essential. Although it is possible to estimate the forces and dynamics involved in the environment through computer vision, it is unreliable when presented with real-world interactions. In this paper, we present a robot action conditioned video and tactile prediction model, that is trained on a dataset of 60,000 pushing interactions between a robot and clusters of household objects. The model uses convolutional dynamic neural advection to predict pixel motion and combines all sensing modalities together in simultaneous tactile and video prediction. To explore this models ability to generalise to novel objects, we include test interactions with unseen objects, not present in the training dataset, visually identical objects with different physical properties and visually occluded scenes. We show that our model, which utilises tactile data, increases the accuracy of prediction both qualitatively and quantitatively when compared to the state of the art action-conditioned video prediction model.
 
-# Problem Statment
-- <img src="https://latex.codecogs.com/gif.latex?Our developed model (SPOTS) performs conditional video prediction based on a set of \textit{c context} frames $\textbf{x}_{0},...,\textbf{x}_{c-1}$. These context frames are previous readings from the interaction. Our target is to sample from $p(\textbf{x}_{c:T}|\textbf{x}_{0:c-1})$ where $\textbf{x}_{i}$ denotes the i$^{th}$ video frame in the sequence, and $T$ is the sum of the context frame length and the prediction horizon length. " />
+This repo accompanies the NeurIPS 2022 paper: Improved Video Prediction with Visual and Tactile Sensation
 
-- <img src="https://latex.codecogs.com/gif.latex?In our setting, we want to modify this generative model to be conditioned on the robot action vector $\textbf{a}$ and the tactile vector $\textbf{d}$. This results in $p(\textbf{x}_c:T|\textbf{x}_{0:c-1}, \textbf{a}_{0:c-1}, \textbf{d}_{0:c-1})$. Although we have access to the tactile data in future frames during training time, we clearly wont during inference beyond timestep $c$, so the tactile data prediction must also be trained and implemented through a second identical generative model that predicts the next tactile frame, $q(\textbf{d}_c:T|\textbf{x}_{0:c-1}, \textbf{a}_{0:c-1}, \textbf{d}_{0:c-1})$. We can formalise these two models together as $p(\textbf{x}_{c:T}, \textbf{d}_{c:T}|\textbf{x}_{0:c-1}, \textbf{a}_{0:c-1}, \textbf{d}_{0:c-1})$. We can then factorise this model to $\Pi^{T}_{t=c}p_{\theta}(\textbf{x}_{t}, \textbf{d}_{t}|\textbf{x}_{0:t-1}, \textbf{a}_{0:t-1}, \textbf{d}_{0:t-1})$. Learning is then training the parameters of these factors $\theta$." />
+First Author: Willow Mandil
+Second Author: Amir Ghalamzan E
 
-# Model Architecture
+Enabling a robotic agent to predict the effect of its actions on its environment is a core robotics challenge. Existing methods apply visual and robot state/action information to make video predictions. However, the less observable the state of physical robot interaction is through visual information, the more uncertain the model is in predicting those interactions. We believe the introduction of tactile sensation is essential. Although it is possible to estimate the forces and dynamics involved in interactions through computer vision, it may be unreliable when presented with real-world interactions, e.g. in the case of occluded camera view. Tactile sensation has not yet been integrated into visual prediction systems for physical robot interaction. This paper explores the impact of introducing this second sensing modality to video prediction of physical robot interactions. We first present a robot pushing dataset of 45'000 frames of a visually identical block object with different friction properties. We then introduce three key video prediction architectures. We explore these models and their key features in a comparative study to show that tactile sensation improves scene prediction accuracy and cause-effect understanding during physical robot interactions.
+
+## Dataset Description
+Locate the dataset and its description at: https://github.com/imanlab/object_pushing_MarkedFrictionDataset
+
+To format the data apply: https://github.com/imanlab/object_pushing_SPOTS_NIPS/blob/main/data_formatting/format_data.py 
+
+
+## Model Architectures:
 For the prediction models p and q we use the convolutional dynamic neural advection (CDNA) model described in finn2016unsupervised with the additional stochastic variational inference network described in babaeizadeh2017stochastic. Of course, the focus of this work is to show the effect on video prediction accuracy of introducing tactile data, so it in not essential to integrate with the best performing VP models at the time, however the model described appears to be one of the best in this class at time of writing nunes2020action. 
 
 These two models are therefor benefiting from one another, this holistic approach enables the scene prediction to be enhanced by tactile sensation, and the tactile prediction to be enhanced by the visual scene.
 
-## Dataset Description
+<img src="https://github.com/imanlab/object_pushing_SPOTS_NIPS/blob/main/SVTG.png" height="450">
+
+<img src="https://github.com/imanlab/object_pushing_SPOTS_NIPS/blob/main/SPOTS.png" height="450">
+
+<img src="https://github.com/imanlab/object_pushing_SPOTS_NIPS/blob/main/SPOTS_SVG_ACTP.png" height="450">
+
+
+

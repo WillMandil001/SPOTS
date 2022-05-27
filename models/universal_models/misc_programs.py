@@ -1,5 +1,6 @@
 import os
-
+from PIL import Image
+import pandas as pd
 import cv2
 import numpy as np
 from glob import glob
@@ -393,6 +394,111 @@ def plot_reduced_data():
     axarr.legend()
     plt.show()
 
+def datset_edge_cases():
+    SVG = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_cases_seq_per_trial/SVG/test_edge_case_trail_trial_per_sequence/"
+    cases = []
+    for i in range(4):
+        for index, timestep in enumerate(range(0, 26)):
+            f, axarr = plt.subplots(1,1)
+            axarr.set_title('t=' + str(timestep), fontsize=18)
+            axarr.set_ylabel("case:" + str(i), fontsize=18)
+            axarr.imshow(cv2.cvtColor (np.transpose (np.load(SVG + "batch_0sub_batch_" + str(i) + "/gt_scene_time_step_" + str(timestep) + ".npy"), (1, 0, 2)), cv2.COLOR_BGR2RGB))
+            axarr.set_xticks([])
+            axarr.set_yticks([])
+            wspace = -0.6  # the amount of width reserved for blank space between subplots
+            hspace = 0.05  # the amount of height reserved for white space between subplots
+            plt.subplots_adjust (left=None, bottom=None, right=None, top=None, wspace=wspace, hspace=hspace)
+            plt.savefig("case_" + str(i) + "_timestep_" + str(timestep), dpi = 500)
+            plt.close()
+
+def video_predictions():
+    SVG_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SVG_100p/test_edge_case_100p/"
+    SVG_TE_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SVG_TE_100p/test_edge_case_100p/"
+    SVTG_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SVTG_100p/test_edge_case_100p/"
+    SVTG_large_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SVTG_large_100p/test_edge_case_100p/"
+    SPOTS_SP_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SPOTS_SP_100p/test_edge_case_100p/"
+    SPOTS_STP_100p = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/comparison_plots/Edge_Cases/SPOTS_STP_100p/test_edge_case_100p/"
+
+    for i in range(88):
+        GT = []
+        pred_SVG_100p = []
+        pred_SVG_TE_100p = []
+        pred_SVTG_100p = []
+        pred_SVTG_large_100p = []
+        pred_SPOTS_SP_100p = []
+        pred_SPOTS_STP_100p = []
+
+        try:
+            os.mkdir("/home/user/Robotics/SPOTS/models/universal_models/saved_models/push_" + str(i))
+        except:
+            pass
+
+        f, axarr = plt.subplots (1, 5)
+        for timestep in range(5):
+            GT.append(np.load(SVG_100p + "batch_0sub_batch_" + str(i) + "/gt_scene_time_step_" + str(timestep) + ".npy"))
+            pred_SVG_100p.append(np.load(SVG_100p + "batch_0sub_batch_" + str(i) + "/pred_scene_time_step_" + str(timestep) + ".npy"))
+            pred_SVG_TE_100p.append(np.load(SVG_TE_100p + "batch_0sub_batch_" + str(i) + "/pred_scene_time_step_" + str(timestep) + ".npy"))
+            pred_SVTG_100p.append(np.load(SVTG_100p + "batch_0sub_batch_" + str(i) + "/pred_scene_time_step_" + str(timestep) + ".npy"))
+            pred_SPOTS_SP_100p.append(np.load(SPOTS_SP_100p + "batch_0sub_batch_" + str(i) + "/pred_scene_time_step_" + str(timestep) + ".npy"))
+
+            axarr[0].imshow (cv2.cvtColor (np.transpose (GT[timestep], (1, 0, 2)), cv2.COLOR_BGR2RGB))
+            axarr[1].imshow (cv2.cvtColor (np.transpose (pred_SVG_100p[timestep], (1, 0, 2)), cv2.COLOR_BGR2RGB))
+            axarr[2].imshow (cv2.cvtColor (np.transpose (pred_SVG_TE_100p[timestep], (1, 0, 2)), cv2.COLOR_BGR2RGB))
+            axarr[3].imshow (cv2.cvtColor (np.transpose (pred_SVTG_100p[timestep], (1, 0, 2)), cv2.COLOR_BGR2RGB))
+            axarr[4].imshow (cv2.cvtColor (np.transpose (pred_SPOTS_SP_100p[timestep], (1, 0, 2)), cv2.COLOR_BGR2RGB))
+
+            axarr[0].set_ylabel("t=" + str(timestep), fontsize=6)
+            axarr[0].set_title('GT', fontsize=6)
+            axarr[1].set_title('SVG', fontsize=6)
+            axarr[2].set_title('SVG-TE', fontsize=6)
+            axarr[3].set_title('SVTG', fontsize=6)
+            axarr[4].set_title('SPOTS-SP', fontsize=6)
+
+            for ii in range(len(axarr)):
+                axarr[ii].set_xticks ([])
+                axarr[ii].set_yticks ([])
+            # plt.tight_layout ()
+            wspace = 0.05# -0.8  # the amount of width reserved for blank space between subplots
+            hspace = 0.05# 0.05  # the amount of height reserved for white space between subplots
+            plt.subplots_adjust (left=None, bottom=None, right=None, top=None, wspace=wspace, hspace=hspace)
+            # plt.show()
+            plt.savefig("/home/user/Robotics/SPOTS/models/universal_models/saved_models/push_" + str(i) + "/batch_0sub_batch_" + str(i) + "_timestep_" + str(timestep), dpi = 400)
+
+def test_data_samples():
+    file = "/home/user/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train/object_1/" + "data_sample_2022-05-16-10-12-05"
+    image_data = np.array(np.load(file + '/color_images.npy'))
+
+    # Resize the image using PIL antialiasing method (Copied from CDNA data formatting)
+    raw = []
+    for k in range(len(image_data)):
+        tmp = Image.fromarray(image_data[k])
+        tmp = tmp.resize((64, 64), Image.ANTIALIAS)
+        tmp = np.fromstring(tmp.tobytes(), dtype=np.uint8)
+        tmp = tmp.reshape((64, 64, 3))
+        tmp = tmp.astype(np.float32) / 255.0
+        raw.append(tmp)
+    image_data = np.array(raw)
+
+    GT = []
+
+    f, axarr = plt.subplots (1, 1)
+    for timestep in range(26):
+
+
+        axarr.imshow(cv2.cvtColor(image_data[timestep], cv2.COLOR_BGR2RGB))
+
+        axarr.set_title("t=" + str(timestep), fontsize=18)
+        # axarr.set_title('GT', fontsize=18)
+        axarr.set_xticks ([])
+        axarr.set_yticks ([])
+        # plt.tight_layout ()
+        wspace = 0.05# -0.8  # the amount of width reserved for blank space between subplots
+        hspace = 0.05# 0.05  # the amount of height reserved for white space between subplots
+        plt.subplots_adjust (left=None, bottom=None, right=None, top=None, wspace=wspace, hspace=hspace)
+        # plt.show()
+        plt.savefig("/home/user/Robotics/SPOTS/models/universal_models/saved_models/push_" + "_timestep_" + str(timestep), dpi = 400)
+
+
 if __name__ == '__main__':
     # plot_training_scores()
     # plot_model_performance()
@@ -402,7 +508,8 @@ if __name__ == '__main__':
     # plot_edge_case_qualitative()
     # plot_edge_case_t4_qualitative()
     # plot_edge_case_scene_synthesis_qualitative()
-    plot_edge_case_reduced_data_qualitative()
+    # plot_edge_case_reduced_data_qualitative()
     # plot_reduced_data()
-
-
+    # datset_edge_cases()
+    # video_predictions()
+    test_data_samples()
