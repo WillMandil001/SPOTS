@@ -6,6 +6,7 @@ import cv2
 import csv
 import glob
 import torch
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,23 +18,46 @@ from sklearn import preprocessing
 from datetime import datetime
 from scipy.spatial.transform import Rotation as R
 
-dataset_path = "/home/user/Robotics/Data_sets/PRI/object1_motion1/"
+# dataset_path = "/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/"
+dataset_path = "/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/"
 # Hyper-parameters:
-train_data_dir = dataset_path + 'Train/'
-test_data_dir  = dataset_path + 'Test_no_new/'
-test_data_dir_2= dataset_path + 'Test_novel/'
-train_out_dir  = dataset_path + 'train_formatted_1c/'
-test_out_dir   = dataset_path + 'test_no_new_formatted_1c/'
-test_out_dir_2 = dataset_path + 'test_novel_formatted_1c/'
-scaler_out_dir = dataset_path + 'scalars_1c/'
+train_data_dir = dataset_path + 'train/'
+test_data_dir = dataset_path + 'test/'
+# test_data_dir_2= dataset_path + 'test_edge_cases/'
 
-smooth = True
+train_out_dir  = dataset_path + 'test_formatted/'
+test_out_dir   = dataset_path + 'train_formatted/'
+# test_out_dir_2 = dataset_path + 'test_edge_case_100p/'
+scaler_out_dir = dataset_path + 'filler_scaler/'
+
+smooth = False
 image = False
 image_height = 64
 image_width = 64
-context_length = 1
+context_length = 2
 horrizon_length = 5
+one_sequence_per_test = False
+data_train_percentage = 1.0
 
+lines = ["smooth: " + str(smooth),
+         "image: " + str(image),
+         "image_height: " + str(image_height),
+         "image_width: " + str(image_width),
+         "context_length: " + str(context_length),
+         "horrizon_length: " + str(horrizon_length),
+         "one_sequence_per_test: " + str(one_sequence_per_test),
+         "data_train_percentage: " + str(data_train_percentage),
+         "dataset_path: " + str(dataset_path),
+         "train_data_dir: " + str(train_data_dir),
+         "test_data_dir: " + str(test_data_dir),
+         "train_out_dir: " + str(train_out_dir),
+         "test_out_dir: " + str(test_out_dir),
+         "test_out_dir_2: " + str(test_out_dir_2),
+         "scaler_out_dir: " + str(scaler_out_dir)]
+with open(scaler_out_dir + "dataset_info.txt", 'w') as f:
+    for line in lines:
+        f.write(line)
+        f.write('\n')
 
 class data_formatter:
     def __init__(self):
@@ -50,9 +74,11 @@ class data_formatter:
         self.image_width = image_width
         self.context_length = context_length
         self.horrizon_length = horrizon_length
+        self.one_sequence_per_test = one_sequence_per_test
+        self.data_train_percentage = data_train_percentage
 
     def create_map(self):
-        for stage in [train_out_dir, test_out_dir, test_out_dir_2]:
+        for stage in [test_out_dir_2]:  #[train_out_dir, test_out_dir, test_out_dir_2]:
             self.path_file = []
             index_to_save = 0
             print(stage)
@@ -62,7 +88,8 @@ class data_formatter:
                 files_to_run = self.files_test
             elif stage == test_out_dir_2:
                 files_to_run = self.files_test_2
-
+            print(files_to_run)
+            path_save = stage
             for experiment_number, file in tqdm(enumerate(files_to_run)):
                 # if stage != train_out_dir:
                 #     path_save = stage + "test_trial_" + str(experiment_number) + '/'
@@ -71,7 +98,6 @@ class data_formatter:
                 #     index_to_save = 0
                 # else:
                 #     path_save = stage
-                path_save = stage
 
                 tactile, robot, image, depth = self.load_file_data(file)
 
@@ -90,7 +116,10 @@ class data_formatter:
                     image_names.append(image_name)
                     np.save(path_save + image_name, image[time_step])
 
-                sequence_length = self.context_length + self.horrizon_length
+                if self.one_sequence_per_test:
+                    sequence_length = self.context_length + self.horrizon_length - 1
+                else:
+                    sequence_length = self.context_length + self.horrizon_length
                 for time_step in range(len(tactile) - sequence_length):
                     robot_data_euler_sequence   = [robot[time_step + t] for t in range(sequence_length)]
                     tactile_data_sequence       = [tactile[time_step + t] for t in range(sequence_length)]
@@ -112,7 +141,8 @@ class data_formatter:
                     ref.append('time_step_data_' + str(index_to_save) + '.npy')
                     self.path_file.append(ref)
                     index_to_save += 1
-
+                    if self.one_sequence_per_test:
+                        break
                 # if stage != train_out_dir:
                 #     self.test_no = experiment_number
                 #     self.save_map(path_save, test=True)
@@ -150,6 +180,7 @@ class data_formatter:
         self.save_scalars()
 
     def load_file_data(self, file):
+        # print(file)
         robot_state = np.array(pd.read_csv(file + '/robot_states.csv', header=None))
         xela_sensor = np.array(np.load(file + '/tactile_states.npy'))
         image_data = np.array(np.load(file + '/color_images.npy'))
@@ -202,12 +233,13 @@ class data_formatter:
             image_data = image_data[3:-3]
             depth_data = depth_data[3:-3]
 
-        return tactile_data, robot_task_space, image_data, depth_data
+        return np.array(tactile_data), robot_task_space, image_data, depth_data
 
     def load_file_names(self):
         self.files_train = glob.glob(train_data_dir + '/*')
         self.files_test = glob.glob(test_data_dir + '/*')
         self.files_test_2 = glob.glob(test_data_dir_2 + '/*')
+        self.files_train = random.sample(self.files_train, int(len(self.files_train) * self.data_train_percentage))
 
     def smooth_the_trial(self, tactile_data):
         for force in range(tactile_data.shape[1]):

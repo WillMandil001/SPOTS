@@ -19,6 +19,7 @@ import torchvision
 # standard video and tactile prediction models:
 from universal_networks.SVG import Model as SVG
 from universal_networks.SVTG_SE import Model as SVTG_SE
+from universal_networks.VTG_SE import Model as VTG_SE
 from universal_networks.SPOTS_SVG_ACTP import Model as SPOTS_SVG_ACTP
 from universal_networks.SPOTS_SVG_PTI_ACTP import Model as SPOTS_SVG_PTI_ACTP
 from universal_networks.SPOTS_SVG_ACTP_STP import Model as SPOTS_SVG_ACTP_STP
@@ -200,6 +201,8 @@ class UniversalModelTrainer:
             self.model = SVG_occ(features)
         elif self.model_name == "SVTG_SE":
             self.model = SVTG_SE(features)
+        elif self.model_name == "VTG_SE":
+            self.model = VTG_SE(features)
         elif self.model_name == "SVTG_SE_occ":
             self.model = SVTG_SE_occ(features)
         elif self.model_name == "SPOTS_SVG_ACTP":
@@ -373,6 +376,13 @@ class UniversalModelTrainer:
             action = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
             mae, predictions = self.model.run(scene=images, actions=action, test=test)
 
+        elif self.model_name == "VTG_SE":
+            images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
+            tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(self.device)
+            action  = batch_features[0].squeeze(-1).permute(1, 0, 2).to(self.device)
+            scene_and_touch = torch.cat((tactile, images), 2)
+            mae, predictions = self.model.run(scene_and_touch=scene_and_touch, actions=action, test=test)
+
         elif self.model_name == "SVTG_SE":
             images  = batch_features[1].permute(1, 0, 4, 3, 2).to(self.device)
             tactile = batch_features[2].permute(1, 0, 4, 3, 2).to(self.device)
@@ -425,8 +435,8 @@ class UniversalModelTrainer:
 
 
 @click.command()
-@click.option('--model_name', type=click.Path(), default="SVG_TE", help='Set name for prediction model, SVG, SVTG_SE, SPOTS_SVG_ACTP, SVG_TC')
-@click.option('--batch_size', type=click.INT, default=64, help='Batch size for training.')
+@click.option('--model_name', type=click.Path(), default="SVG", help='Set name for prediction model, SVG, SVTG_SE, SPOTS_SVG_ACTP, SVG_TC')
+@click.option('--batch_size', type=click.INT, default=128, help='Batch size for training.')
 @click.option('--lr', type=click.FLOAT, default = 0.0001, help = "learning rate")
 @click.option('--beta1', type=click.FLOAT, default = 0.9, help = "Beta gain")
 @click.option('--log_dir', type=click.Path(), default = 'logs/lp', help = "Not sure :D")
@@ -434,7 +444,7 @@ class UniversalModelTrainer:
 @click.option('--niter', type=click.INT, default = 300, help = "")
 @click.option('--seed', type=click.INT, default = 1, help = "")
 @click.option('--image_width', type=click.INT, default = 64, help = "Size of scene image data")
-@click.option('--dataset', type=click.Path(), default = 'object1_motion1_position1', help = "name of the dataset")
+@click.option('--dataset', type=click.Path(), default = 'Dataset3_MarkedHeavyBox', help = "name of the dataset")
 @click.option('--n_past', type=click.INT, default = 2, help = "context sequence length")
 @click.option('--n_future', type=click.INT, default = 5, help = "time horizon sequence length")
 @click.option('--n_eval', type=click.INT, default = 7, help = "sum of context and time horizon")
@@ -459,9 +469,9 @@ class UniversalModelTrainer:
 @click.option('--training_stages', type=click.Path(), default = "", help = "define the training stages - if none leave blank - available: 3part")
 @click.option('--training_stages_epochs', type=click.Path(), default = "50,75,125", help = "define the end point of each training stage")
 @click.option('--num_workers', type=click.INT, default = 12, help = "number of workers used by the data loader")
-@click.option('--model_save_path', type=click.Path(), default = "/home/user/Robotics/SPOTS/models/universal_models/saved_models/", help = "")
-@click.option('--train_data_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/train_formatted/", help = "")
-@click.option('--scaler_dir', type=click.Path(), default = "/home/user/Robotics/Data_sets/PRI/object1_motion1/scalars/", help = "")
+@click.option('--model_save_path', type=click.Path(), default = "/home/willmandil/Robotics/SPOTS/models/universal_models/saved_models/", help = "")
+@click.option('--train_data_dir', type=click.Path(), default = "/home/willmandil/Robotics/Data_sets/PRI/Dataset3_MarkedHeavyBox/train_formatted_trial_per_sequence/", help = "")
+@click.option('--scaler_dir', type=click.Path(), default = "/home/willmandil/Robotics/Data_sets/PRI/object1_motion1_combined/scalars_trial_per_sequence/", help = "")
 @click.option('--model_name_save_appendix', type=click.Path(), default = "", help = "What to add to the save file to identify the model as a specific subset (_1c= 1 conditional frame, GTT=groundtruth tactile data)")
 @click.option('--tactile_encoder_hidden_size', type=click.INT, default = 0, help = "Size of hidden layer in tactile encoder, 200")
 @click.option('--tactile_encoder_output_size', type=click.INT, default = 0, help = "size of output layer from tactile encoder, 100")
@@ -508,9 +518,13 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         out_channels = 3
         training_stages = [""]
         training_stages_epochs = [epochs]
-    elif model_name == "SVTG_SE" or model_name == "SVTG_SE_occ":
-        g_dim = 256 * 2
-        rnn_size = 256 * 2
+    elif model_name == "SVTG_SE" or model_name == "SVTG_SE_occ" or model_name == "VTG_SE":
+        if model_name_save_appendix== "large":
+            g_dim = 256 * 4
+            rnn_size = 256 * 4
+        else:
+            g_dim = 256 * 2
+            rnn_size = 256 * 2
         channels = 6
         out_channels = 6
         training_stages = [""]
@@ -521,11 +535,19 @@ def main(model_name, batch_size, lr, beta1, log_dir, optimizer, niter, seed, ima
         rnn_size = 256
         channels = 3
         out_channels = 3
-        training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
-        training_stages_epochs = [35, 65, 150]
-        # training_stages_epochs = [50, 75, 125]
+        training_stages = [""]
+        training_stages_epochs = [epochs]
         tactile_size = 48
-        epochs = training_stages_epochs[-1] + 1
+        if training_stages == "3part"
+            g_dim = 256
+            rnn_size = 256
+            channels = 3
+            out_channels = 3
+            training_stages = ["scene_only", "tactile_loss_plus_scene_fixed", "scene_loss_plus_tactile_gradual_increase"]
+            training_stages_epochs = [35, 65, 150]
+            tactile_size = 48
+            epochs = training_stages_epochs[-1] + 1
+
     elif model_name == "SVG_TC_TE" or model_name == "SVG_TC_TE_occ" or model_name == "SVG_TE":
         g_dim = 256
         rnn_size = 256
