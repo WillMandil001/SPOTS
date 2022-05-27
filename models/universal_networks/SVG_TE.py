@@ -75,15 +75,15 @@ class Model:
         self.frame_predictor = full_model["frame_predictor"]
         self.posterior = full_model["posterior"]
         self.prior = full_model["prior"]
-        self.encoder = full_model["encoder"]
-        self.decoder = full_model["decoder"]
+        self.encoder_scene = full_model["encoder_scene"]
+        self.decoder_scene = full_model["decoder_scene"]
         self.encoder_tactile = full_model["encoder_tactile"]
 
         self.frame_predictor.cuda()
         self.posterior.cuda()
         self.prior.cuda()
-        self.encoder.cuda()
-        self.decoder.cuda()
+        self.encoder_scene.cuda()
+        self.decoder_scene.cuda()
         self.encoder_tactile.cuda()
         self.mae_criterion.cuda()
 

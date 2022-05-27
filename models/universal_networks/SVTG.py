@@ -101,18 +101,26 @@ class Model:
     def load_model(self, full_model):
         self.optimizer = optim.Adam
         self.frame_predictor = full_model["frame_predictor"]
+        self.posterior = full_model["posterior"]
+        self.prior = full_model["prior"]
         self.encoder = full_model["encoder"]
         self.decoder = full_model["decoder"]
 
         self.frame_predictor.cuda()
+        self.posterior.cuda()
+        self.prior.cuda()
         self.encoder.cuda()
         self.decoder.cuda()
         self.mae_criterion.cuda()
 
     def initialise_model(self):
         import universal_networks.lstm as lstm_models
-        self.frame_predictor = lstm_models.lstm(self.g_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        self.frame_predictor = lstm_models.lstm(self.g_dim + self.z_dim + self.state_action_size, self.g_dim, self.rnn_size, self.predictor_rnn_layers, self.batch_size)
+        self.posterior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
+        self.prior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
         self.frame_predictor.apply(utility_prog.init_weights)
+        self.posterior.apply(utility_prog.init_weights)
+        self.prior.apply(utility_prog.init_weights)
 
         import universal_networks.dcgan_64 as model
         self.encoder = model.encoder(self.g_dim, self.channels)
@@ -121,17 +129,22 @@ class Model:
         self.decoder.apply(utility_prog.init_weights)
 
         self.frame_predictor_optimizer = self.optimizer(self.frame_predictor.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.posterior_optimizer = self.optimizer(self.posterior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        self.prior_optimizer = self.optimizer(self.prior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.encoder_optimizer = self.optimizer(self.encoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
         self.decoder_optimizer = self.optimizer(self.decoder.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
 
         self.frame_predictor.cuda()
+        self.posterior.cuda()
+        self.prior.cuda()
         self.encoder.cuda()
         self.decoder.cuda()
         self.mae_criterion.cuda()
 
     def save_model(self):
         torch.save({'encoder': self.encoder, 'decoder': self.decoder, 'frame_predictor': self.frame_predictor,
-                    'features': self.features}, self.model_dir + "SVTG_SE_model" + self.model_name_save_appendix)
+                    'posterior': self.posterior, 'prior': self.prior, 'features': self.features},
+                    self.model_dir + "SVTG_SE_model" + self.model_name_save_appendix)
 
     def set_train(self):
         self.frame_predictor.train()
@@ -167,22 +180,47 @@ class Model:
 
             if index > self.n_past - 1:  # horizon
                 h, skip = self.encoder(x_pred)
-                h_pred = self.frame_predictor(torch.cat([h, state_action], 1))  # prediction model
+                h_target = self.encoder(scene_and_touch[index + 1])[0]
+
+                if test:
+                    _, mu, logvar = self.posterior(h_target)  # learned prior
+                    z_t, mu_p, logvar_p = self.prior(h)  # learned prior
+                else:
+                    z_t, mu, logvar = self.posterior(h_target)  # learned prior
+                    _, mu_p, logvar_p = self.prior(h)  # learned prior
+
+                h_pred = self.frame_predictor(torch.cat([h, z_t, state_action], 1))  # prediction model
                 x_pred = self.decoder([h_pred, skip])  # prediction model
+
                 mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
+                kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
 
                 outputs.append(x_pred)
             else:  # context
                 h, skip = self.encoder(scene_and_touch[index])
-                h_pred = self.frame_predictor(torch.cat([h, state_action], 1))  # prediction model
+                h_target = self.encoder(scene_and_touch[index + 1])[0]   # should this [0] be here????
+
+                scene_and_tactile_enc = torch.cat([h, z_t, state_action], 1)
+
+                if test:
+                    _, mu, logvar = self.posterior(h_target)  # learned prior
+                    z_t, mu_p, logvar_p = self.prior(h)  # learned prior
+                else:
+                    z_t, mu, logvar = self.posterior(h_target)  # learned prior
+                    _, mu_p, logvar_p = self.prior(h)  # learned prior
+
+                h_pred = self.frame_predictor(scene_and_tactile_enc)  # prediction model
                 x_pred = self.decoder([h_pred, skip])  # prediction model
+
                 mae += self.mae_criterion(x_pred, scene_and_touch[index + 1])  # prediction model
+                kld += self.kl_criterion(mu, logvar, mu_p, logvar_p)  # learned prior
+
                 last_output = x_pred
 
         outputs = [last_output] + outputs
 
         if test is False:
-            loss = mae
+            loss = mae + (kld * self.beta)
             loss.backward()
 
             self.frame_predictor_optimizer.step()
@@ -191,7 +229,7 @@ class Model:
             self.encoder_optimizer.step()
             self.decoder_optimizer.step()
 
-        return mae.data.cpu().numpy() / (self.n_past + self.n_future), torch.stack(outputs)
+        return mae.data.cpu().numpy() / (self.n_past + self.n_future), kld.data.cpu().numpy() / (self.n_future + self.n_past), torch.stack(outputs)
 
     def kl_criterion(self, mu1, logvar1, mu2, logvar2):
         sigma1 = logvar1.mul(0.5).exp()

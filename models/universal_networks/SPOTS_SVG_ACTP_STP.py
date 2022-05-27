@@ -57,7 +57,7 @@ class Model:
         self.training_stages = features["training_stages"]
         self.training_stages_epochs = features["training_stages_epochs"]
         self.tactile_size = features["tactile_size"]
-        # self.model_name_save_appendix = features["model_name_save_appendix"]
+        self.model_name_save_appendix = features["model_name_save_appendix"]
 
         if self.optimizer == "adam" or self.optimizer == "Adam":
             self.optimizer = optim.Adam
@@ -135,8 +135,8 @@ class Model:
         self.mae_criterion_tactile.cuda()
 
         # PRIOR:
-        self.posterior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
-        self.prior = lstm_models.gaussian_lstm(self.g_dim, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
+        self.posterior = lstm_models.gaussian_lstm(self.g_dim + self.tactile_size, self.z_dim, self.rnn_size, self.posterior_rnn_layers, self.batch_size)
+        self.prior = lstm_models.gaussian_lstm(self.g_dim + self.tactile_size, self.z_dim, self.rnn_size, self.prior_rnn_layers, self.batch_size)
         self.posterior.apply(utility_prog.init_weights)
         self.prior.apply(utility_prog.init_weights)
         self.posterior_optimizer = self.optimizer(self.posterior.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
@@ -181,16 +181,18 @@ class Model:
                 h_scene, skip_scene = self.encoder_scene(x_pred_scene)
                 h_target_scene      = self.encoder_scene(scene[index + 1])[0]
 
+                h_target_scene_and_tactile = torch.cat([tactile[index + 1], h_scene], 1)
+
                 # cat scene and tactile together for crossover input to pipelines
                 h_scene_and_tactile = torch.cat([x_pred_tactile, h_scene], 1)
 
                 # Learned Prior - Z_t calculation
                 if test:
-                    _, mu, logvar = self.posterior(h_target_scene)  # learned prior
-                    z_t, mu_p, logvar_p = self.prior(h_scene)  # learned prior
+                    _, mu, logvar = self.posterior(h_target_scene_and_tactile)  # learned prior
+                    z_t, mu_p, logvar_p = self.prior(h_scene_and_tactile)  # learned prior
                 else:
-                    z_t, mu, logvar = self.posterior(h_target_scene)  # learned prior
-                    _, mu_p, logvar_p = self.prior(h_scene)  # learned prior
+                    z_t, mu, logvar = self.posterior(h_target_scene_and_tactile)  # learned prior
+                    _, mu_p, logvar_p = self.prior(h_scene_and_tactile)  # learned prior
 
                 # Multi-modal feature model:
                 MM_rep_scene = self.MMFM_scene(h_scene_and_tactile)
@@ -217,16 +219,18 @@ class Model:
                 h_scene, skip_scene = self.encoder_scene(scene[index])
                 h_target_scene      = self.encoder_scene(scene[index + 1])[0]
 
+                h_target_scene_and_tactile = torch.cat([tactile[index + 1], h_scene], 1)
+
                 # cat scene and tactile together for crossover input to pipelines
                 h_scene_and_tactile = torch.cat([tactile[index], h_scene], 1)
 
                 # Learned Prior - Z_t calculation
                 if test:
-                    _, mu, logvar = self.posterior(h_target_scene)  # learned prior
-                    z_t, mu_p, logvar_p = self.prior(h_scene)  # learned prior
+                    _, mu, logvar = self.posterior(h_target_scene_and_tactile)  # learned prior
+                    z_t, mu_p, logvar_p = self.prior(h_scene_and_tactile)  # learned prior
                 else:
-                    z_t, mu, logvar = self.posterior(h_target_scene)  # learned prior
-                    _, mu_p, logvar_p = self.prior(h_scene)  # learned prior
+                    z_t, mu, logvar = self.posterior(h_target_scene_and_tactile)  # learned prior
+                    _, mu_p, logvar_p = self.prior(h_scene_and_tactile)  # learned prior
 
                 # Multi-modal feature model:
                 MM_rep_scene = self.MMFM_scene(h_scene_and_tactile)
@@ -351,13 +355,13 @@ class Model:
 
     def save_model(self, stage="best"):
         if stage == "best":
-            save_name = "SPOTS_SVG_ACTP_BEST"
+            save_name = "SPOTS_SVG_ACTP_STP_BEST"
         elif stage == "scene_only":
-            save_name = "SPOTS_SVG_ACTP_stage1"
+            save_name = "SPOTS_SVG_ACTP_STP_stage1"
         elif stage == "tactile_loss_plus_scene_fixed":
-            save_name = "SPOTS_SVG_ACTP_stage2"
+            save_name = "SPOTS_SVG_ACTP_STP_stage2"
         elif stage == "scene_loss_plus_tactile_gradual_increase":
-            save_name = "SPOTS_SVG_ACTP_stage3"
+            save_name = "SPOTS_SVG_ACTP_STP_stage3"
 
         torch.save({"frame_predictor_tactile": self.frame_predictor_tactile,
                     "frame_predictor_scene": self.frame_predictor_scene, "encoder_scene": self.encoder_scene,
